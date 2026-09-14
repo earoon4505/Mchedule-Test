@@ -58,6 +58,7 @@ import { ApiKeyModal } from './components/settings/ApiKeyModal';
 import { NoticeModal } from './components/common/NoticeModal';
 import { LegalModal, LegalTab } from './components/legal/LegalModal';
 import { PiPOverlay } from './components/pip/PiPOverlay';
+import { AdSenseBanner } from './components/ads/AdSenseBanner';
 import { IncompleteScheduleAlertModal } from './components/common/IncompleteScheduleAlertModal';
 import { 
   CharacterAlertStatus, 
@@ -1842,6 +1843,9 @@ export default function App() {
               </button>
             </div>
           )}
+
+          {/* [웹 전용] 구글 애드센스 광고 영역 - 캐릭터 유무와 상관없이 중앙 하단 고정 (데스크톱 앱에서는 비표시) */}
+          <AdSenseBanner />
         </section>
 
         {/* 우측 진행률 패널 */}
