@@ -96,16 +96,18 @@ All AI agents working on this project MUST strictly follow these rules:
 
 ## 📋 핵심 업데이트 및 개발 이력 (Changelog for AI Agents)
 
-### [웹 전용 구글 애드센스 광고 영역 분리 및 투명 기본 영역 적용] (최신)
-1. **스케줄 하단 광고 영역 분리 (`src/components/ads/AdSenseBanner.tsx`, `src/App.tsx`)**:
+### [웹 전용 구글 애드센스 광고 영역 분리 및 심사/크롤러 대응 구축] (최신)
+1. **구글 애드센스 정적 검증 스크립트 및 `public/ads.txt` 구축 (`index.html`, `public/ads.txt`)**:
+   - 구글 애드센스 사이트 소유권 확인 봇이 페이지를 즉시 인증할 수 있도록 `index.html`의 `<head>` 태그 내에 공식 애드센스 스크립트(`ca-pub-9376850026832369`) 정적 배치.
+   - 도메인 루트 접근용 `public/ads.txt` (`google.com, pub-9376850026832369, DIRECT, f08c47fec0942fa0`) 생성 완료.
+2. **스케줄 하단 광고 영역 분리 (`src/components/ads/AdSenseBanner.tsx`, `src/App.tsx`)**:
    - 캐릭터 등록 전(빈 화면 상태)과 등록 후(스케줄 목록 상태) 모두에서 일관되게 노출되도록 중앙 메인 섹션(`section#main-content-section`) 하단 공통 영역으로 배치.
    - 스케줄 리스트(`flex-1 overflow-y-scroll`) 하단에 독립된 `flex-shrink-0` 박스로 분리 배치하여 스케줄 항목들과 겹치거나 깨지지 않도록 구조적 영역 분할 완료.
    - 표준 배너 규격(728 × 90)을 반영하여 `minHeight: 90px`, `height: 90px` 설정.
-   - 사용자 요청에 따라 임시 안내 문구 및 파란색 배경을 제거하고, 상단 얇은 구분선(`border-t`)과 투명 배경(`bg-transparent`)으로 자연스럽게 정돈.
-2. **웹 버전 전용 격리 및 데스크톱(Electron) 앱 보호 (`isElectron` 가드)**:
-   - 데스크톱(Electron) 환경에서는 광고 컴포넌트가 일절 렌더링되지 않으며, AdSense 스크립트도 로드되지 않음.
-   - 웹 브라우저 환경(`!isElectron`)에서만 구글 애드센스 비동기 스크립트(`ca-pub-9376850026832369`)가 안전하게 동적 로드됨.
-3. **듀얼 플랫폼 100% 호환성 및 무결성 유지**.
+   - 상단 얇은 구분선(`border-t`)과 투명 배경(`bg-transparent`)으로 깔끔한 기본 여백 유지.
+3. **웹 버전 전용 격리 및 데스크톱(Electron) 앱 보호 (`isElectron` 가드)**:
+   - 데스크톱(Electron) 환경에서는 광고 컴포넌트가 일절 렌더링되지 않으며, 광고 스크립트 실행도 100% 차단됨.
+4. **듀얼 플랫폼 100% 호환성 및 무결성 유지**.
 
 ### [1.0.5 업데이트] PiP 모드 계정 컨텐츠 배치 수정, 앱 다운로드 버튼 임시 삭제, PiP 토글 지원
 1. **[수정] PiP 모드 계정 공통 컨텐츠 짤림 현상 배치 수정 (`StandalonePiPView.tsx`, `PiPOverlay.tsx`)**:
