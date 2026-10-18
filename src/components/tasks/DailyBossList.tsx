@@ -125,7 +125,7 @@ export const DailyBossList: React.FC<DailyBossListProps> = React.memo(({
         }`}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-          <MapleIcon name={displayName} icon={boss.icon} fallback="💀" className="w-12 h-12 rounded-xl object-contain flex-shrink-0" />
+          <MapleIcon name={displayName} icon={boss.icon} fallback="💀" className="w-12 h-12 object-contain flex-shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className={`text-xs font-bold truncate ${isDone ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
@@ -170,8 +170,12 @@ export const DailyBossList: React.FC<DailyBossListProps> = React.memo(({
 
   return (
     <div id="daily-boss-list">
-      {/* 일일 보스 상단 요약 바 (sky 계열) */}
-      <div className={`relative overflow-hidden flex flex-wrap items-center justify-between gap-3 p-4 border rounded-2xl shadow-xs transition-all ${
+      {/* 일일 보스 상단 요약 바 (sky 계열, 박스 전체 클릭 시 펼치기/접기 지원) */}
+      <div 
+        onClick={collapsible ? () => setIsCollapsed((prev) => !prev) : undefined}
+        className={`relative overflow-hidden flex flex-wrap items-center justify-between gap-3 p-4 border rounded-2xl shadow-xs transition-all ${
+          collapsible ? 'cursor-pointer select-none' : ''
+        } ${
         isAlertActive && !isAllCompleted
           ? 'border-2 border-red-500 ring-2 ring-red-500/50 animate-pulse bg-red-50/40 dark:bg-red-950/20 shadow-md shadow-red-500/20'
           : isAllCompleted
@@ -227,7 +231,11 @@ export const DailyBossList: React.FC<DailyBossListProps> = React.memo(({
         <div className="flex items-center gap-2 relative z-10">
           {collapsible && (
             <button
-              onClick={() => setIsCollapsed((prev) => !prev)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsCollapsed((prev) => !prev);
+              }}
               className={`p-1.5 rounded-xl border transition-colors shadow-xs ml-0.5 cursor-pointer ${
                 isAllCompleted
                   ? 'border-sky-200 dark:border-sky-800 bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 hover:bg-sky-200 dark:hover:bg-sky-800'
@@ -235,7 +243,13 @@ export const DailyBossList: React.FC<DailyBossListProps> = React.memo(({
               }`}
               title={isCollapsed ? '목록 펼치기' : '목록 접기'}
             >
-              {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              <motion.div
+                animate={{ rotate: isCollapsed ? 180 : 0 }}
+                transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+                className="flex items-center justify-center"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </motion.div>
             </button>
           )}
         </div>
@@ -246,15 +260,31 @@ export const DailyBossList: React.FC<DailyBossListProps> = React.memo(({
         {!isCollapsed && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{
-              height: { duration: 0.28, ease: [0.33, 1, 0.68, 1] },
-              opacity: { duration: 0.2, ease: 'easeOut' },
+            animate={{ 
+              height: 'auto', 
+              opacity: 1,
+              transition: {
+                height: { duration: 0.35, ease: [0.16, 1, 0.3, 1] },
+                opacity: { duration: 0.25, delay: 0.05, ease: 'easeOut' },
+              }
+            }}
+            exit={{ 
+              height: 0, 
+              opacity: 0,
+              transition: {
+                height: { duration: 0.3, ease: [0.16, 1, 0.3, 1] },
+                opacity: { duration: 0.18, ease: 'easeIn' },
+              }
             }}
             className="overflow-hidden"
           >
-            <div className="pt-3.5 space-y-4">
+            <motion.div
+              initial={{ y: -8, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -8, opacity: 0 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              className="pt-3.5 space-y-4"
+            >
               {/* 1. 등록된 일일 보스 항목 */}
           {selectedBosses.length > 0 && (
             <div className="space-y-2.5">
@@ -287,7 +317,7 @@ export const DailyBossList: React.FC<DailyBossListProps> = React.memo(({
               </div>
             </div>
           )}
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

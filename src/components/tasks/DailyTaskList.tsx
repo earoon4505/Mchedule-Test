@@ -70,8 +70,12 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
 
   return (
     <div id="daily-task-list">
-      {/* 일일 컨텐츠 상단 요약 바 */}
-      <div className={`relative overflow-hidden flex flex-wrap items-center justify-between gap-3 p-4 border rounded-2xl shadow-xs transition-all ${
+      {/* 일일 컨텐츠 상단 요약 바 (박스 전체 클릭 시 펼치기/접기 지원) */}
+      <div 
+        onClick={collapsible ? () => setIsCollapsed((prev) => !prev) : undefined}
+        className={`relative overflow-hidden flex flex-wrap items-center justify-between gap-3 p-4 border rounded-2xl shadow-xs transition-all ${
+          collapsible ? 'cursor-pointer select-none' : ''
+        } ${
         isAlertActive && !isAllCompleted
           ? 'border-2 border-red-500 ring-2 ring-red-500/50 animate-pulse bg-red-50/40 dark:bg-red-950/20 shadow-md shadow-red-500/20'
           : isAllCompleted
@@ -115,15 +119,25 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
         <div className="flex items-center gap-2 relative z-10">
           {collapsible && (
             <button
-              onClick={() => setIsCollapsed((prev) => !prev)}
-              className={`p-1.5 rounded-xl border transition-colors shadow-xs ml-0.5 ${
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsCollapsed((prev) => !prev);
+              }}
+              className={`p-1.5 rounded-xl border transition-colors shadow-xs ml-0.5 cursor-pointer ${
                 isAllCompleted
                   ? 'border-amber-200 dark:border-amber-800 bg-amber-100/80 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800'
                   : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-500 hover:text-amber-600'
               }`}
               title={isCollapsed ? '목록 펼치기' : '목록 접기'}
             >
-              {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              <motion.div
+                animate={{ rotate: isCollapsed ? 180 : 0 }}
+                transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+                className="flex items-center justify-center"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </motion.div>
             </button>
           )}
         </div>
@@ -134,15 +148,31 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
         {!isCollapsed && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{
-              height: { duration: 0.28, ease: [0.33, 1, 0.68, 1] },
-              opacity: { duration: 0.2, ease: 'easeOut' },
+            animate={{ 
+              height: 'auto', 
+              opacity: 1,
+              transition: {
+                height: { duration: 0.35, ease: [0.16, 1, 0.3, 1] },
+                opacity: { duration: 0.25, delay: 0.05, ease: 'easeOut' },
+              }
+            }}
+            exit={{ 
+              height: 0, 
+              opacity: 0,
+              transition: {
+                height: { duration: 0.3, ease: [0.16, 1, 0.3, 1] },
+                opacity: { duration: 0.18, ease: 'easeIn' },
+              }
             }}
             className="overflow-hidden"
           >
-            <div className="pt-3.5 space-y-4">
+            <motion.div
+              initial={{ y: -8, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -8, opacity: 0 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              className="pt-3.5 space-y-4"
+            >
               {totalCount === 0 ? (
             <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl text-slate-400">
               <p className="text-xs font-semibold">선택된 일일 컨텐츠가 없습니다.</p>
@@ -178,7 +208,7 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
                           }`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                            <MapleIcon name={task.name} icon={task.icon} fallback="🌊" className="w-11 h-11 rounded-xl object-contain flex-shrink-0" />
+                            <MapleIcon taskId={task.id} name={task.name} icon={task.icon} fallback="🌊" className="w-11 h-11 object-contain flex-shrink-0" />
                             <div className="min-w-0 flex-1">
                               <p className={`text-xs font-bold truncate ${isDone ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
                                 {task.name}
@@ -225,7 +255,7 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
                           }`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                            <MapleIcon name={task.name} icon={task.icon} fallback="☀️" className="w-11 h-11 rounded-xl object-contain flex-shrink-0" />
+                            <MapleIcon taskId={task.id} name={task.name} icon={task.icon} fallback="☀️" className="w-11 h-11 object-contain flex-shrink-0" />
                             <div className="min-w-0 flex-1">
                               <p className={`text-xs font-bold truncate ${isDone ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
                                 {task.name}
@@ -250,7 +280,7 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
               )}
             </div>
           )}
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

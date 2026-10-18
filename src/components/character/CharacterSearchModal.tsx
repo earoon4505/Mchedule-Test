@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  X, 
+  X,
   Search, 
   UserPlus, 
   AlertCircle,
@@ -9,12 +9,15 @@ import {
   RefreshCw,
   Plus
 } from 'lucide-react';
-import { CharacterInfo, NexonAccountCharacter } from '../../types';
+import { CharacterInfo, NexonAccountCharacter, ApiKeyItem } from '../../types';
 import { fetchAccountCharacters, fetchNexonSchedulerState, fetchCharacterBasic } from '../../services/api';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { getDefaultEnabledTasksForLevel, getDefaultBossesForLevel, getDefaultDailyBossesForLevel } from '../../data/defaultTasks';
 import { extractInGameRegisteredTasks } from '../../utils/schedulerParser';
 import { CharacterAvatar } from './CharacterAvatar';
+import { getStoredApiKeys } from '../../utils/accountHelper';
+import { DEFAULT_COMMON_CONTENT_IDS, saveStoredCommonContentIds, getStoredCommonContentsMap } from '../../utils/commonContents';
+import { motion } from 'motion/react';
 
 interface CharacterSearchModalProps {
   isOpen: boolean;
@@ -22,6 +25,7 @@ interface CharacterSearchModalProps {
   onAddCharacter: (char: CharacterInfo) => void;
   existingCharacters: CharacterInfo[];
   hasApiKey?: boolean;
+  apiKeys?: ApiKeyItem[];
   onOpenApiKeyModal?: () => void;
 }
 
@@ -31,6 +35,7 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
   onAddCharacter,
   existingCharacters,
   hasApiKey = false,
+  apiKeys,
   onOpenApiKeyModal,
 }) => {
   const [accountCharacters, setAccountCharacters] = useState<NexonAccountCharacter[]>([]);
@@ -39,6 +44,7 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedWorld, setSelectedWorld] = useState<string>('all');
+  const [selectedAccount, setSelectedAccount] = useState<string>('all');
   const [justAddedNames, setJustAddedNames] = useState<Set<string>>(new Set());
 
   // 모달 열릴 때 API 캐릭터 목록 로드
@@ -47,6 +53,7 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
       setErrorMsg(null);
       setSearchQuery('');
       setSelectedWorld('all');
+      setSelectedAccount('all');
       setJustAddedNames(new Set());
       loadApiCharacters(false);
     }
@@ -82,7 +89,69 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
     return set;
   }, [existingCharacters]);
 
-  // 고유 월드 목록 추출 및 공식 메이플스토리 월드 순서대로 정렬
+  // 고유 계정(API Key) 목록 추출 (등록 순서 정렬 보장)
+  const availableAccounts = useMemo(() => {
+    const map = new Map<string, { alias: string; count: number }>();
+    accountCharacters.forEach((c) => {
+      const keyId = c.apiKeyId || 'default';
+      const alias = c.apiKeyAlias || '기본 계정';
+      const existing = map.get(keyId);
+      if (existing) {
+        existing.count++;
+      } else {
+        map.set(keyId, { alias, count: 1 });
+      }
+    });
+
+    const registeredKeys = apiKeys && apiKeys.length > 0 ? apiKeys : getStoredApiKeys();
+    const result: { id: string; alias: string; count: number }[] = [];
+
+    if (registeredKeys && registeredKeys.length > 0) {
+      registeredKeys.forEach((k) => {
+        if (map.has(k.id)) {
+          const item = map.get(k.id)!;
+          result.push({
+            id: k.id,
+            alias: k.alias || item.alias,
+            count: item.count,
+          });
+          map.delete(k.id);
+        }
+      });
+    }
+
+    map.forEach((item, id) => {
+      result.push({
+        id,
+        alias: item.alias,
+        count: item.count,
+      });
+    });
+
+    return result;
+  }, [accountCharacters, apiKeys]);
+
+  // 연결된 API가 2개 이상인지 여부 (1개 이하일 경우 API 별칭 뱃지 및 계정 필터 미표시)
+  const isMultiAccount = useMemo(() => {
+    const totalKeys = apiKeys && apiKeys.length > 0 ? apiKeys.length : getStoredApiKeys().length;
+    return totalKeys >= 2 || availableAccounts.length >= 2;
+  }, [apiKeys, availableAccounts]);
+
+  // 계정 선택 시 해당 계정에 존재하지 않는 월드가 선택되어 있다면 자동으로 전체 월드로 초기화
+  const handleSelectAccount = (accId: string) => {
+    setSelectedAccount(accId);
+    if (selectedWorld !== 'all') {
+      const chars = accId === 'all'
+        ? accountCharacters
+        : accountCharacters.filter((c) => (c.apiKeyId || 'default') === accId);
+      const exists = chars.some((c) => c.world_name === selectedWorld);
+      if (!exists) {
+        setSelectedWorld('all');
+      }
+    }
+  };
+
+  // 고유 월드 목록 추출 및 공식 메이플스토리 월드 순서대로 정렬 (선택된 계정에 존재하는 월드 기준)
   const availableWorlds = useMemo(() => {
     const OFFICIAL_WORLD_ORDER = [
       '스카니아', '베라', '루나', '제니스', '크로아', '유니온', '엘리시움', '이노시스',
@@ -91,7 +160,11 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
     ];
 
     const worlds = new Set<string>();
-    accountCharacters.forEach((c) => {
+    const chars = selectedAccount === 'all'
+      ? accountCharacters
+      : accountCharacters.filter((c) => (c.apiKeyId || 'default') === selectedAccount);
+
+    chars.forEach((c) => {
       if (c.world_name) worlds.add(c.world_name);
     });
 
@@ -103,12 +176,16 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
       if (idxB !== -1) return 1;
       return a.localeCompare(b, 'ko');
     });
-  }, [accountCharacters]);
+  }, [accountCharacters, selectedAccount]);
 
   // API 내 캐릭터 검색 & 필터링 (상단 검색기능으로 API 내 캐릭터만 필터링)
   const filteredCharacters = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return accountCharacters.filter((char) => {
+      // 계정 필터
+      if (selectedAccount !== 'all' && (char.apiKeyId || 'default') !== selectedAccount) {
+        return false;
+      }
       // 월드 필터
       if (selectedWorld !== 'all' && char.world_name !== selectedWorld) {
         return false;
@@ -122,7 +199,7 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
       }
       return true;
     });
-  }, [accountCharacters, searchQuery, selectedWorld]);
+  }, [accountCharacters, searchQuery, selectedAccount, selectedWorld]);
 
   if (!isOpen) return null;
 
@@ -146,8 +223,8 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
     if (char.ocid) {
       try {
         // 프로필 이미지가 없는 경우 기본 정보 동시 조회
-        const schedPromise = fetchNexonSchedulerState(char.ocid, true);
-        const basicPromise = !charImage ? fetchCharacterBasic({ ocid: char.ocid }) : Promise.resolve(null);
+        const schedPromise = fetchNexonSchedulerState(char.ocid, true, undefined, char.character_name, char.apiKeyId);
+        const basicPromise = !charImage ? fetchCharacterBasic({ ocid: char.ocid, name: char.character_name }, false, char.apiKeyId) : Promise.resolve(null);
 
         const [schedRes, basicRes] = await Promise.all([schedPromise, basicPromise]);
 
@@ -164,7 +241,7 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
             initialBlackMageId = selectedBlackMageId;
           }
         } else {
-          // 인게임 스케줄러 조회 실패 시 최소한의 레벨별 퀘스트만 기본 활성화 (보스는 임의 등록 방지)
+          // 인게임 스케줄러 조회 실패 시 레벨별 기본 퀘스트 및 계정 컨텐츠 등록
           initialTasks = getDefaultEnabledTasksForLevel(level);
         }
       } catch (err) {
@@ -173,6 +250,22 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
     } else {
       initialTasks = getDefaultEnabledTasksForLevel(level);
     }
+
+    // [요구사항 1] 레벨 무관: 계정 컨텐츠(몬스터파크, 하이마운틴, 앵글러 등 모든 에픽던전) 기본값 무조건 전체 등록
+    DEFAULT_COMMON_CONTENT_IDS.forEach((commonId) => {
+      if (!initialTasks.includes(commonId)) {
+        initialTasks.push(commonId);
+      }
+    });
+
+    // 계정 공통 컨텐츠 관리 저장소에도 해당 계정 키의 기본값을 전체 활성화(체크)로 보장
+    try {
+      const currentMap = getStoredCommonContentsMap();
+      const targetKey = char.apiKeyId || 'default';
+      if (!currentMap[targetKey] || currentMap[targetKey].length === 0) {
+        saveStoredCommonContentIds(targetKey, DEFAULT_COMMON_CONTENT_IDS);
+      }
+    } catch (_) {}
 
     const newChar: CharacterInfo = {
       id: char.ocid || `char_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -189,6 +282,7 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
       selectedBossIds: initialBosses,
       selectedDailyBossIds: initialDailyBosses,
       selectedBlackMageId: initialBlackMageId,
+      apiKeyId: char.apiKeyId,
       lastSyncedAt: new Date().toISOString(),
     };
 
@@ -203,7 +297,7 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
     >
       <div 
         id="character-search-modal"
-        className="w-full max-w-4xl h-[85vh] max-h-[850px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden text-slate-800 dark:text-slate-100 flex flex-col transition-all"
+        className="w-full max-w-lg sm:max-w-4xl max-h-[82dvh] sm:h-[85vh] sm:max-h-[850px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden text-slate-800 dark:text-slate-100 flex flex-col transition-all"
       >
         {/* 1. 모달 상단 헤더 */}
         <div className="px-5 sm:px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/90 flex-shrink-0">
@@ -231,20 +325,12 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
                 <span className="hidden sm:inline">새로고침</span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="닫기"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
         </div>
 
-        {/* 2. API 키 미등록 시 상태 */}
+        {/* 2. API 키 미등록 시 상태 (스크롤바 숨김: no-scrollbar) */}
         {!hasApiKey ? (
-          <div className="flex-1 p-8 sm:p-12 flex flex-col items-center justify-center text-center max-w-lg mx-auto space-y-6 overflow-y-auto custom-scrollbar">
+          <div className="flex-1 p-8 sm:p-12 flex flex-col items-center justify-center text-center max-w-lg mx-auto space-y-6 overflow-y-auto no-scrollbar touch-pan-y overscroll-contain">
             <div className="w-16 h-16 rounded-3xl bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-md flex-shrink-0">
               <Key className="w-8 h-8" />
             </div>
@@ -296,8 +382,7 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="캐릭터명, 직업, 월드 검색"
-                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9.5 pr-8 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 shadow-xs"
-                    autoFocus
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9.5 pr-8 py-2 text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 shadow-xs"
                   />
                   {searchQuery && (
                     <button
@@ -310,42 +395,118 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
                   )}
                 </div>
 
-                {/* 월드 선택 셀렉트 */}
-                {availableWorlds.length > 0 && (
-                  <div className="flex items-center flex-shrink-0">
-                    <select
-                      value={selectedWorld}
-                      onChange={(e) => setSelectedWorld(e.target.value)}
-                      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-orange-500 shadow-xs cursor-pointer"
-                    >
-                      <option value="all">전체 월드 ({accountCharacters.length})</option>
-                      {availableWorlds.map((world) => {
-                        const count = accountCharacters.filter((c) => c.world_name === world).length;
-                        return (
-                          <option key={world} value={world}>
-                            {world} ({count})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* 월드 선택 셀렉트 */}
+                  {availableWorlds.length > 0 && (
+                    <div className="flex items-center flex-shrink-0">
+                      <select
+                        id="api-character-world-filter"
+                        value={selectedWorld}
+                        onChange={(e) => setSelectedWorld(e.target.value)}
+                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-hidden focus:border-orange-500 shadow-xs cursor-pointer"
+                      >
+                        <option value="all">전체 월드 ({accountCharacters.length})</option>
+                        {availableWorlds.map((world) => {
+                          const count = accountCharacters.filter((c) => c.world_name === world).length;
+                          return (
+                            <option key={world} value={world}>
+                              {world} ({count})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* 계정 필터 버튼 목록 (다계정 이용 시 표시: 계정 컨텐츠처럼 필 버튼 목록으로 렌더링) */}
+              {isMultiAccount && availableAccounts.length >= 2 && (
+                <div 
+                  id="api-character-account-buttons"
+                  className="flex flex-wrap items-center gap-1.5 pt-0.5 select-none relative"
+                >
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1 flex-shrink-0">
+                    <Key className="w-3.5 h-3.5 text-orange-500" />
+                    <span>계정:</span>
+                  </div>
+
+                  {/* 전체 계정 필 버튼 */}
+                  <button
+                    key="all"
+                    type="button"
+                    onClick={() => handleSelectAccount('all')}
+                    className={`relative px-2.5 py-1 rounded-full text-[11px] font-bold tracking-tight whitespace-nowrap cursor-pointer focus:outline-hidden transition-colors ${
+                      selectedAccount === 'all'
+                        ? 'text-white'
+                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-2xs'
+                    }`}
+                  >
+                    {selectedAccount === 'all' && (
+                      <motion.div
+                        layoutId="activeModalAccountPill"
+                        className="absolute inset-0 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 shadow-xs"
+                        transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <span className="relative z-10">전체 계정 ({accountCharacters.length})</span>
+                  </button>
+
+                  {/* 등록된 개별 계정 필 버튼 */}
+                  {availableAccounts.map((acc) => {
+                    const isSelected = selectedAccount === acc.id;
+                    return (
+                      <button
+                        key={acc.id}
+                        type="button"
+                        onClick={() => handleSelectAccount(acc.id)}
+                        className={`relative px-2.5 py-1 rounded-full text-[11px] font-bold tracking-tight whitespace-nowrap cursor-pointer focus:outline-hidden transition-colors ${
+                          isSelected
+                            ? 'text-white'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-2xs'
+                        }`}
+                      >
+                        {isSelected && (
+                          <motion.div
+                            layoutId="activeModalAccountPill"
+                            className="absolute inset-0 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 shadow-xs"
+                            transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                          />
+                        )}
+                        <span className="relative z-10">{acc.alias} ({acc.count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* 검색 및 필터 현황 카운터 */}
               <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-1">
                 <span>
-                  {searchQuery ? (
-                    <>검색 <strong className="text-orange-600 dark:text-orange-400">{filteredCharacters.length}</strong> / 전체 {accountCharacters.length}개</>
+                  {(searchQuery || selectedWorld !== 'all' || selectedAccount !== 'all') ? (
+                    <>필터링 <strong className="text-orange-600 dark:text-orange-400">{filteredCharacters.length}</strong> / 전체 {accountCharacters.length}개</>
                   ) : (
                     <>총 <strong className="text-slate-900 dark:text-white font-bold">{accountCharacters.length}</strong>개 캐릭터</>
                   )}
                 </span>
+                {(selectedAccount !== 'all' || selectedWorld !== 'all' || searchQuery) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedAccount('all');
+                      setSelectedWorld('all');
+                      setSearchQuery('');
+                    }}
+                    className="text-[10px] text-slate-400 hover:text-orange-500 underline cursor-pointer"
+                  >
+                    필터 초기화
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* 캐릭터 카드 그리드 영역 */}
-            <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar flex flex-col">
+            {/* 캐릭터 카드 그리드 영역 (스크롤바 숨김: no-scrollbar) */}
+            <div className="flex-1 p-4 sm:p-6 overflow-y-auto no-scrollbar touch-pan-y overscroll-contain flex flex-col min-h-0">
               {isLoading ? (
                 <div className="flex-1 flex flex-col items-center justify-center min-h-[300px]">
                   <LoadingSpinner size="lg" text="캐릭터 목록을 불러오는 중..." />
@@ -414,11 +575,10 @@ export const CharacterSearchModal: React.FC<CharacterSearchModalProps> = ({
                             : 'bg-white dark:bg-slate-800/70 border-slate-200/90 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-500 hover:shadow-md hover:bg-orange-50/20 dark:hover:bg-orange-950/20 cursor-pointer'
                         }`}
                       >
-                        {/* 등록 상태 태그 */}
-                        {isRegistered && (
-                          <div className="absolute top-2.5 right-2.5 z-10 px-1.5 py-0.5 rounded-md bg-emerald-500 text-white text-[9px] font-bold flex items-center gap-0.5 shadow-xs">
-                            <Check className="w-2.5 h-2.5" />
-                            <span>등록됨</span>
+                        {/* 계정 별칭 태그 (연결된 API가 2개 이상인 다계정일 때만 표시) */}
+                        {isMultiAccount && char.apiKeyAlias && (
+                          <div className="absolute top-2.5 left-2.5 z-10 px-1.5 py-0.5 rounded-md bg-slate-100/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 text-[9px] font-semibold border border-slate-200/80 dark:border-slate-700/80 max-w-[85px] truncate shadow-2xs backdrop-blur-xs">
+                            {char.apiKeyAlias}
                           </div>
                         )}
 

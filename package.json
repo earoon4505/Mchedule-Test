@@ -3,24 +3,31 @@
   "productName": "메케줄",
   "author": "MapleSchedule",
   "description": "메이플스토리 통합 스케줄러 & 보스 체크 데스크톱 앱",
-  "version": "1.0.5",
+  "version": "1.0.7",
   "main": "electron/main.cjs",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "node scripts/prepare-build.cjs && vite build && esbuild server.ts --bundle --platform=node --format=cjs --external:vite --sourcemap --outfile=dist/server.cjs",
+    "build": "BUILD_TARGET=web vite build && esbuild server.ts --bundle --platform=node --format=cjs --external:vite --sourcemap --outfile=dist/server.cjs",
+    "build:web": "BUILD_TARGET=web vite build",
+    "build:desktop": "BUILD_TARGET=desktop node scripts/prepare-build.cjs && BUILD_TARGET=desktop vite build && esbuild server.ts --bundle --platform=node --format=cjs --external:vite --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "dist": "npm run build && electron-builder --win nsis",
-    "dist:win": "npm run build && electron-builder --win nsis",
-    "dist:portable": "npm run build && electron-builder --win portable"
+    "dist": "npm run build:desktop && electron-builder --win nsis",
+    "dist:win": "npm run build:desktop && electron-builder --win nsis",
+    "dist:portable": "npm run build:desktop && electron-builder --win portable"
   },
   "build": {
     "appId": "com.maple.schedule",
     "productName": "메케줄",
+    "publish": {
+      "provider": "github",
+      "owner": "earoon4505",
+      "repo": "Mchedule"
+    },
     "directories": {
       "output": "release"
     },
@@ -33,6 +40,7 @@
     ],
     "win": {
       "icon": "public/icon.ico",
+      "artifactName": "${productName} Setup ${version}.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -47,6 +55,9 @@
           ]
         }
       ]
+    },
+    "portable": {
+      "artifactName": "${productName} ${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -65,6 +76,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",
+    "electron-updater": "^6.8.9",
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",

@@ -1,6 +1,11 @@
 const fs = require('fs');
 const path = require('path');
-const png2icons = require('png2icons');
+let png2icons = null;
+try {
+  png2icons = require('png2icons');
+} catch (e) {
+  // png2icons may not be installed in all environments (e.g. cloud build)
+}
 
 const root = path.join(__dirname, '..');
 const buildDir = path.join(root, 'build');
@@ -29,7 +34,7 @@ const candidatePngs = [
 
 let sourcePng = candidatePngs.find((p) => fs.existsSync(p));
 
-if (sourcePng) {
+if (sourcePng && png2icons) {
   try {
     const pngBuf = fs.readFileSync(sourcePng);
     // Create standard Windows ICO format (BMP-based) using HERMITE algorithm
@@ -43,6 +48,18 @@ if (sourcePng) {
     }
   } catch (err) {
     console.error('[prepare-build] Error creating icon.ico:', err);
+  }
+}
+
+// 3. Sync scouter boss definitions for Electron packaging
+const scouterDefsSource = path.join(root, 'src', 'data', 'scouterBossDefinitions.json');
+const scouterDefsDest = path.join(root, 'electron', 'scouterBossDefinitions.json');
+if (fs.existsSync(scouterDefsSource)) {
+  try {
+    fs.copyFileSync(scouterDefsSource, scouterDefsDest);
+    console.log('[prepare-build] Successfully synced scouterBossDefinitions.json to electron/');
+  } catch (e) {
+    console.error('[prepare-build] Error syncing scouterBossDefinitions.json:', e);
   }
 }
 

@@ -52,6 +52,7 @@ function getRequestHeaders(extra: Record<string, string> = {}): Record<string, s
     if (keys.length > 0) {
       headers['x-nxopen-api-key'] = keys[0].apiKey;
       headers['x-user-api-keys'] = JSON.stringify(keys.map((k) => k.apiKey));
+      headers['x-user-api-key-items'] = JSON.stringify(keys);
     }
   }
   return headers;
@@ -187,36 +188,58 @@ export async function addApiKey(apiKey: string, alias?: string): Promise<{ succe
   }
 }
 
-// API 키 별칭 수정
-export async function updateApiKeyAlias(id: string, alias: string): Promise<{ success: boolean; keys?: ApiKeyItem[]; message?: string; error?: string }> {
+// API 키 정보(alias, apiKey) 수정
+export async function updateApiKey(
+  id: string,
+  updates: { alias?: string; apiKey?: string }
+): Promise<{ success: boolean; keys?: ApiKeyItem[]; message?: string; error?: string }> {
+  const { alias, apiKey } = updates;
+  if (!alias && !apiKey) {
+    return { success: false, error: '변경할 별칭 또는 API 키를 입력해주세요.' };
+  }
+
   if (isWeb) {
-    if (!alias || typeof alias !== 'string' || alias.trim().length === 0) {
-      return { success: false, error: '변경할 별칭을 입력해주세요.' };
-    }
     const keys = getWebLocalApiKeys();
     const idx = keys.findIndex((k) => k.id === id);
     if (idx === -1) {
       return { success: false, error: '해당 API 키를 찾을 수 없습니다.' };
     }
-    keys[idx].alias = alias.trim();
+
+    if (alias && alias.trim().length > 0) {
+      keys[idx].alias = alias.trim();
+    }
+
+    if (apiKey && apiKey.trim().length > 0) {
+      const trimmedKey = apiKey.trim();
+      if (keys.some((k, i) => i !== idx && k.apiKey === trimmedKey)) {
+        return { success: false, error: '이미 다른 항목에 등록되어 있는 API 키입니다.' };
+      }
+      keys[idx].apiKey = trimmedKey;
+    }
+
     saveWebLocalApiKeys(keys);
-    return { success: true, keys, message: '별칭이 성공적으로 변경되었습니다.' };
+    return { success: true, keys, message: 'API 키 정보가 성공적으로 변경되었습니다.' };
   }
 
   try {
     const res = await fetch(`/api/nexon/keys/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ alias }),
+      body: JSON.stringify({ alias, apiKey }),
     });
     const json = await res.json();
     if (!res.ok || !json.success) {
-      return { success: false, error: json.error || '별칭 수정에 실패했습니다.' };
+      return { success: false, error: json.error || 'API 키 정보 수정에 실패했습니다.' };
     }
     return { success: true, keys: json.keys, message: json.message };
   } catch (e: any) {
     return { success: false, error: e.message || '네트워크 오류가 발생했습니다.' };
   }
+}
+
+// API 키 별칭 수정 (호환성 유지)
+export async function updateApiKeyAlias(id: string, alias: string): Promise<{ success: boolean; keys?: ApiKeyItem[]; message?: string; error?: string }> {
+  return updateApiKey(id, { alias });
 }
 
 // 특정 API 키 삭제
@@ -238,6 +261,45 @@ export async function removeApiKey(id: string): Promise<{ success: boolean; keys
     const json = await res.json();
     if (!res.ok || !json.success) {
       return { success: false, error: json.error || 'API 키 삭제에 실패했습니다.' };
+    }
+    return { success: true, keys: json.keys, message: json.message };
+  } catch (e: any) {
+    return { success: false, error: e.message || '네트워크 오류가 발생했습니다.' };
+  }
+}
+
+// [백업 복원 전용] 백업 파일로부터 API 키 목록 일괄 복원 및 동기화
+export async function restoreApiKeys(keys: ApiKeyItem[]): Promise<{ success: boolean; keys?: ApiKeyItem[]; message?: string; error?: string }> {
+  if (!Array.isArray(keys)) {
+    return { success: false, error: '유효한 API 키 목록이 아닙니다.' };
+  }
+
+  if (isWeb) {
+    try {
+      saveWebLocalApiKeys(keys);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('mapleschedule_cached_apikeys_v1', JSON.stringify(keys));
+        window.dispatchEvent(new Event('storage'));
+      }
+      return { success: true, keys, message: `${keys.length}개의 API 키가 복원되었습니다.` };
+    } catch (e: any) {
+      return { success: false, error: e.message || '웹 로컬스토리지 저장 실패' };
+    }
+  }
+
+  try {
+    const res = await fetch('/api/nexon/keys/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keys }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      return { success: false, error: json.error || '데스크톱 API 키 복원 실패' };
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mapleschedule_cached_apikeys_v1', JSON.stringify(json.keys || keys));
+      window.dispatchEvent(new Event('storage'));
     }
     return { success: true, keys: json.keys, message: json.message };
   } catch (e: any) {
@@ -324,10 +386,23 @@ export async function testApiKey(apiKey?: string): Promise<{ success: boolean; m
           'Content-Type': 'application/json',
         },
       });
-      if (res.status === 401 || res.status === 403) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const errName = data?.error?.name || '';
+        const errMsg = data?.error?.message || '';
+
+        // 캐릭터명이 없는 경우(OPENAPI00004)는 API 키 자체는 유효한 것임
+        if (errName === 'OPENAPI00004') {
+          return {
+            success: true,
+            message: 'NEXON Open API 연결 테스트에 성공했습니다!',
+          };
+        }
+
+        // 400, 401, 403 및 키 관련 에러코드(OPENAPI00005, OPENAPI00003, OPENAPI00001 등)
         return {
           success: false,
-          error: '유효하지 않은 API 키이거나 권한이 없습니다. 키를 다시 확인해주세요.',
+          error: errMsg || '유효하지 않은 API 키이거나 권한이 없습니다. 키를 다시 확인해주세요.',
         };
       }
       return {
@@ -447,7 +522,8 @@ export async function searchNexonCharacter(name: string): Promise<SearchCharacte
 
 export async function fetchCharacterBasic(
   ocidOrName: { ocid?: string; name?: string },
-  force = false
+  force = false,
+  apiKeyId?: string
 ): Promise<{ success: boolean; basic?: NexonCharacterBasic; newOcid?: string; error?: string }> {
   // 1차: 데스크톱(Electron) 환경에서는 로컬 Express 프록시 우선 호출
   if (!isWeb) {
@@ -455,6 +531,7 @@ export async function fetchCharacterBasic(
       const params = new URLSearchParams();
       if (ocidOrName.ocid) params.set('ocid', ocidOrName.ocid);
       if (ocidOrName.name) params.set('name', ocidOrName.name);
+      if (apiKeyId) params.set('apiKeyId', apiKeyId);
       if (force) params.set('force', 'true');
 
       const headers = getRequestHeaders();
@@ -485,9 +562,12 @@ export async function fetchCharacterBasic(
       return { success: false, error: '등록된 API 키가 없습니다.' };
     }
 
+    const preferredKey = apiKeyId ? keys.find((k) => k.id === apiKeyId) : undefined;
+    const orderedKeys = preferredKey ? [preferredKey, ...keys.filter((k) => k.id !== apiKeyId)] : keys;
+
     let targetOcid = ocidOrName.ocid;
     if (!targetOcid && ocidOrName.name) {
-      for (const k of keys) {
+      for (const k of orderedKeys) {
         try {
           const idRes = await fetch(`https://open.api.nexon.com/maplestory/v1/id?character_name=${encodeURIComponent(ocidOrName.name.trim())}`, {
             headers: { 'x-nxopen-api-key': k.apiKey, 'Content-Type': 'application/json' },
@@ -505,9 +585,9 @@ export async function fetchCharacterBasic(
       return { success: false, error: '캐릭터 OCID를 찾을 수 없습니다.' };
     }
 
-    // 등록된 모든 키를 순회하여 성공하는 키로 기본 정보 조회
+    // 등록된 모든 키를 순회하여 성공하는 키로 기본 정보 조회 (선호 키 최우선)
     let basicData: NexonCharacterBasic | null = null;
-    for (const k of keys) {
+    for (const k of orderedKeys) {
       try {
         const basicRes = await fetch(`https://open.api.nexon.com/maplestory/v1/character/basic?ocid=${encodeURIComponent(targetOcid)}`, {
           headers: { 'x-nxopen-api-key': k.apiKey, 'Content-Type': 'application/json' },
@@ -523,7 +603,7 @@ export async function fetchCharacterBasic(
     // 월드리프 등으로 기존 OCID가 만료되어 조회가 실패한 경우:
     // 캐릭터명이 제공되어 있다면 닉네임으로 최신 OCID를 조회하여 자동 치유(Self-Healing)
     if (!basicData && ocidOrName.name) {
-      for (const k of keys) {
+      for (const k of orderedKeys) {
         try {
           const idRes = await fetch(`https://open.api.nexon.com/maplestory/v1/id?character_name=${encodeURIComponent(ocidOrName.name.trim())}`, {
             headers: { 'x-nxopen-api-key': k.apiKey, 'Content-Type': 'application/json' },
@@ -532,7 +612,7 @@ export async function fetchCharacterBasic(
             const idData = await idRes.json();
             if (idData.ocid && idData.ocid !== targetOcid) {
               const freshOcid = idData.ocid;
-              for (const k2 of keys) {
+              for (const k2 of orderedKeys) {
                 const retryRes = await fetch(`https://open.api.nexon.com/maplestory/v1/character/basic?ocid=${encodeURIComponent(freshOcid)}`, {
                   headers: { 'x-nxopen-api-key': k2.apiKey, 'Content-Type': 'application/json' },
                 });
@@ -561,6 +641,84 @@ export async function fetchCharacterBasic(
     return { success: false, error: '기본 정보 조회 실패' };
   } catch (e: any) {
     return { success: false, error: e.message || '네트워크 오류' };
+  }
+}
+
+// 캐릭터 전투력 조회 (넥슨 공식 API)
+export async function fetchCharacterCombatPower(
+  ocid: string,
+  apiKeyId?: string
+): Promise<{ success: boolean; combatPower?: string; arcaneForce?: number; authenticForce?: number; error?: string }> {
+  if (!ocid || !ocid.trim()) {
+    return { success: false, error: 'OCID가 필요합니다.' };
+  }
+
+  // 1차: 데스크톱(Electron) 환경에서는 로컬 Express 프록시 우선 호출
+  if (!isWeb) {
+    try {
+      const params = new URLSearchParams({ ocid: ocid.trim() });
+      if (apiKeyId) params.set('apiKeyId', apiKeyId);
+
+      const headers = getRequestHeaders();
+      const res = await fetch(`/api/nexon/character/stat?${params.toString()}`, { headers });
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        if (res.ok && data.success) {
+          return {
+            success: true,
+            combatPower: data.combatPower || '0',
+            arcaneForce: typeof data.arcaneForce === 'number' ? data.arcaneForce : undefined,
+            authenticForce: typeof data.authenticForce === 'number' ? data.authenticForce : undefined,
+          };
+        }
+      }
+    } catch (_) {
+      // 프록시 실패 시 웹 직접 조회로 폴백
+    }
+  }
+
+  // 2차: 웹 환경 또는 폴백 (브라우저 직접 fetch)
+  try {
+    const keys = getWebLocalApiKeys();
+    if (keys.length === 0) {
+      return { success: false, error: '등록된 API 키가 없습니다.' };
+    }
+
+    const preferredKey = apiKeyId ? keys.find((k) => k.id === apiKeyId) : undefined;
+    const orderedKeys = preferredKey ? [preferredKey, ...keys.filter((k) => k.id !== apiKeyId)] : keys;
+
+    for (const k of orderedKeys) {
+      try {
+        const statRes = await fetch(`https://open.api.nexon.com/maplestory/v1/character/stat?ocid=${encodeURIComponent(ocid.trim())}`, {
+          headers: { 'x-nxopen-api-key': k.apiKey, 'Content-Type': 'application/json' },
+        });
+        if (statRes.ok) {
+          const statData = await statRes.json();
+          let combatPower = '0';
+          let arcaneForce = 0;
+          let authenticForce = 0;
+          if (Array.isArray(statData.final_stat)) {
+            const cpItem = statData.final_stat.find((s: any) => s.stat_name === '전투력');
+            if (cpItem && cpItem.stat_value) {
+              combatPower = String(cpItem.stat_value);
+            }
+            const afItem = statData.final_stat.find((s: any) => s.stat_name === '아케인포스');
+            if (afItem && afItem.stat_value) {
+              arcaneForce = Number(afItem.stat_value) || 0;
+            }
+            const authItem = statData.final_stat.find((s: any) => s.stat_name === '어센틱포스');
+            if (authItem && authItem.stat_value) {
+              authenticForce = Number(authItem.stat_value) || 0;
+            }
+          }
+          return { success: true, combatPower, arcaneForce, authenticForce };
+        }
+      } catch (_) {}
+    }
+    return { success: false, error: '전투력 정보를 가져오지 못했습니다.' };
+  } catch (err: any) {
+    return { success: false, error: err.message || '네트워크 오류' };
   }
 }
 
@@ -626,7 +784,12 @@ export async function fetchAccountCharacters(force = false): Promise<AccountChar
           } else if (Array.isArray(listData)) {
             rawList = listData;
           }
-          return rawList.map((c) => ({ ...c, _key: k.apiKey }));
+          return rawList.map((c) => ({
+            ...c,
+            _key: k.apiKey,
+            apiKeyId: k.id,
+            apiKeyAlias: k.alias,
+          }));
         } catch (_) {
           return [];
         }
@@ -661,6 +824,8 @@ export async function fetchAccountCharacters(force = false): Promise<AccountChar
         character_image: c.character_image || cachedImg || '',
         character_gender: c.character_gender || '',
         character_guild_name: c.character_guild_name || '',
+        apiKeyId: c.apiKeyId,
+        apiKeyAlias: c.apiKeyAlias,
         _key: c._key,
       };
     });
@@ -708,7 +873,8 @@ export async function fetchNexonSchedulerState(
   ocid: string,
   force = false,
   customDate?: string,
-  characterName?: string
+  characterName?: string,
+  apiKeyId?: string
 ): Promise<SyncSchedulerResult> {
   // 1차: 데스크톱(Electron) 환경에서는 로컬 Express 프록시를 통해 조회
   if (!isWeb) {
@@ -717,6 +883,7 @@ export async function fetchNexonSchedulerState(
       params.set('ocid', ocid);
       if (characterName) params.set('name', characterName);
       if (customDate) params.set('date', customDate);
+      if (apiKeyId) params.set('apiKeyId', apiKeyId);
       if (force) params.set('force', 'true');
       const headers = getRequestHeaders();
       const url = `/api/nexon/character/scheduler?${params.toString()}`;
@@ -755,11 +922,14 @@ export async function fetchNexonSchedulerState(
     };
   }
 
+  const preferredKey = apiKeyId ? keys.find((k) => k.id === apiKeyId) : undefined;
+  const orderedKeys = preferredKey ? [preferredKey, ...keys.filter((k) => k.id !== apiKeyId)] : keys;
+
   const dateParam = customDate ? `&date=${encodeURIComponent(customDate)}` : '';
   let targetUrl = `https://open.api.nexon.com/maplestory/v1/scheduler/character-state?ocid=${encodeURIComponent(ocid)}${dateParam}`;
 
   let lastError = '스케줄러 상태 조회 실패';
-  for (const k of keys) {
+  for (const k of orderedKeys) {
     try {
       const res = await fetch(targetUrl, {
         headers: {
@@ -797,7 +967,7 @@ export async function fetchNexonSchedulerState(
   // 웹 환경에서 조회가 실패하고 characterName이 제공된 경우 (월드리프 등으로 OCID 만료 가능성):
   // 닉네임으로 최신 OCID 조회 후 재시도 (자가 치유)
   if (characterName) {
-    for (const k of keys) {
+    for (const k of orderedKeys) {
       try {
         const idRes = await fetch(`https://open.api.nexon.com/maplestory/v1/id?character_name=${encodeURIComponent(characterName.trim())}`, {
           headers: { 'x-nxopen-api-key': k.apiKey, 'Content-Type': 'application/json' },
@@ -807,7 +977,7 @@ export async function fetchNexonSchedulerState(
           if (idData.ocid && idData.ocid !== ocid) {
             const freshOcid = idData.ocid;
             const freshUrl = `https://open.api.nexon.com/maplestory/v1/scheduler/character-state?ocid=${encodeURIComponent(freshOcid)}${dateParam}`;
-            for (const k2 of keys) {
+            for (const k2 of orderedKeys) {
               const res2 = await fetch(freshUrl, {
                 headers: { 'x-nxopen-api-key': k2.apiKey, 'Content-Type': 'application/json' },
               });
@@ -907,5 +1077,115 @@ export async function resetServerAppData(): Promise<boolean> {
   } catch (e) {
     console.error('Failed to reset server db', e);
     return false;
+  }
+}
+
+// ----------------------------------------------------
+// NEXON Open API & Game Server 점검 자동 감지 시스템
+// ----------------------------------------------------
+export type NexonMaintenanceType = 'none' | 'api_maintenance' | 'game_maintenance';
+
+export interface NexonServerCheckResult {
+  isMaintenance: boolean;
+  type: NexonMaintenanceType;
+  statusCode?: number;
+  message?: string;
+}
+
+// 점검 상태 전역 이벤트 알림 함수
+export function dispatchNexonMaintenance(type: NexonMaintenanceType, message?: string, statusCode?: number) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('mapleschedule:nexon_maintenance', {
+        detail: {
+          isMaintenance: type !== 'none',
+          type,
+          message,
+          statusCode,
+        },
+      })
+    );
+  }
+}
+
+// 넥슨 Open API 상태 경량 점검 함수 (웹/데스크톱 듀얼 지원)
+export async function checkNexonServerStatus(): Promise<NexonServerCheckResult> {
+  try {
+    let activeKey = '';
+    if (isWeb) {
+      const keys = getWebLocalApiKeys();
+      if (keys.length > 0) {
+        activeKey = keys[0].apiKey;
+      }
+    } else {
+      const keyRes = await fetchApiKeys();
+      if (keyRes.keys && keyRes.keys.length > 0) {
+        activeKey = keyRes.keys[0].apiKey;
+      }
+    }
+
+    // 등록된 키가 없으면 점검 여부를 단독 확인하기 어려우므로 'none' 반환
+    if (!activeKey) {
+      return { isMaintenance: false, type: 'none' };
+    }
+
+    let status = 200;
+    let errJson: any = null;
+
+    if (isWeb) {
+      // 웹: 브라우저에서 가벼운 핑 테스트 호출
+      const testRes = await fetch(
+        `https://open.api.nexon.com/maplestory/v1/id?character_name=${encodeURIComponent('메이플용사')}`,
+        {
+          headers: {
+            'x-nxopen-api-key': activeKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      status = testRes.status;
+      errJson = await testRes.json().catch(() => ({}));
+    } else {
+      // 데스크톱: 로컬 서버의 핑 테스트 엔드포인트 호출
+      const testRes = await fetch('/api/nexon/key/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: activeKey }),
+      });
+      status = testRes.status;
+      errJson = await testRes.json().catch(() => ({}));
+    }
+
+    // 1. 503: 넥슨 Open API 자체 점검
+    if (status === 503) {
+      const result: NexonServerCheckResult = {
+        isMaintenance: true,
+        type: 'api_maintenance',
+        statusCode: 503,
+        message: '현재 넥슨 Open API 서버가 점검 중입니다.',
+      };
+      dispatchNexonMaintenance(result.type, result.message, 503);
+      return result;
+    }
+
+    // 2. 500: 메이플 게임 서버 점검 또는 내부 시스템 통신 지연
+    if (status === 500) {
+      const errMsg = errJson?.error?.message || errJson?.error || '메이플스토리 게임 서버 점검 또는 넥슨 내부 통신 지연 중입니다.';
+      const result: NexonServerCheckResult = {
+        isMaintenance: true,
+        type: 'game_maintenance',
+        statusCode: 500,
+        message: errMsg.includes('점검') ? errMsg : '메이플스토리 게임 서버 점검 또는 넥슨 내부 통신 지연 중입니다.',
+      };
+      dispatchNexonMaintenance(result.type, result.message, 500);
+      return result;
+    }
+
+    // 3. 정상 응답 (200) 또는 일반 클라이언트 코드 (400, 403, 429 등)는 점검이 아님
+    dispatchNexonMaintenance('none');
+    return { isMaintenance: false, type: 'none', statusCode: status };
+  } catch (e: any) {
+    // 네트워크 단절 등
+    return { isMaintenance: false, type: 'none', message: e?.message };
   }
 }

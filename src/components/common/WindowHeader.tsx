@@ -74,7 +74,7 @@ export const WindowHeader: React.FC<WindowHeaderProps> = React.memo(({
           (window as any).electronAPI.maximize();
         }
       }}
-      className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between px-3 select-none flex-shrink-0 z-30 transition-colors titlebar-drag"
+      className="h-[calc(3rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] lg:h-12 lg:pt-0 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between px-3 select-none flex-shrink-0 z-30 transition-colors titlebar-drag"
     >
       {/* 1. 좌측 영역: 앱 로고 & 미완료 캐릭터 알림 뱃지 */}
       <div className="flex items-center gap-3 flex-shrink-0 min-w-0">
@@ -192,11 +192,11 @@ export const WindowHeader: React.FC<WindowHeaderProps> = React.memo(({
           <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-orange-500' : ''}`} />
         </button>
 
-        {/* 4. 다크/라이트 모드 토글 버튼 (아이콘만 표시) */}
+        {/* 4. 다크/라이트 모드 토글 버튼 (아이콘만 표시, 모바일에서는 요청에 따라 숨김) */}
         <button
           id="btn-header-darkmode-toggle"
           onClick={onToggleDarkMode}
-          className="h-7 w-7 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-2xs"
+          className="hidden lg:flex h-7 w-7 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 items-center justify-center flex-shrink-0 shadow-2xs"
           title={darkMode ? '라이트 모드로 전환' : '다크 모드로 전환'}
         >
           {darkMode ? (

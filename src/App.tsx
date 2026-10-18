@@ -4,7 +4,8 @@ import {
   CharacterProgressRecord, 
   AppSettings, 
   AppDataPayload,
-  CustomTask
+  CustomTask,
+  ApiKeyItem
 } from './types';
 import { 
   getKSTDailyKey, 
@@ -24,7 +25,11 @@ import {
   deleteApiKey,
   fetchNexonSchedulerState, 
   searchNexonCharacter,
-  fetchCharacterBasic
+  fetchCharacterBasic,
+  fetchApiKeys,
+  restoreApiKeys,
+  checkNexonServerStatus,
+  NexonMaintenanceType
 } from './services/api';
 import { 
   getDefaultEnabledTasksForLevel, 
@@ -38,9 +43,15 @@ import {
   sortBossIdsByStandardOrder,
   sortDailyBossIdsByStandardOrder
 } from './utils/schedulerParser';
+import { 
+  isAccountMonsterParkApiVerified, 
+  getAccountMonsterParkTotalCount 
+} from './utils/monsterParkTracker';
 import { sendWindowsNotification, playCheckSound } from './utils/notifications';
 import { APP_LOGO_SRC, onLogoError } from './utils/image';
-import { broadcastAppData, subscribeToBroadcast } from './utils/syncChannel';
+import { broadcastAppData, subscribeToBroadcast, subscribeToApiKeys } from './utils/syncChannel';
+import { getStoredApiKeys } from './utils/accountHelper';
+import { getStoredCommonContentsMap, removeStoredCommonContentId } from './utils/commonContents';
 
 import { WindowHeader } from './components/common/WindowHeader';
 import { CharacterSidebar } from './components/character/CharacterSidebar';
@@ -53,12 +64,15 @@ import { BlackMageCard } from './components/tasks/BlackMageCard';
 import { CustomTaskList } from './components/tasks/CustomTaskList';
 import { ContentConfigModal } from './components/tasks/ContentConfigModal';
 import { ProgressPanel } from './components/stats/ProgressPanel';
+import { ConversionPageView } from './components/conversion/ConversionPageView';
 import { SettingsModal } from './components/settings/SettingsModal';
+// import { AdSenseBanner } from './components/ads/AdSenseBanner'; // 추후 광고 배너 활성화 시 주석 해제
 import { ApiKeyModal } from './components/settings/ApiKeyModal';
 import { NoticeModal } from './components/common/NoticeModal';
+import { MobileBottomNav, MobileTabType } from './components/common/MobileBottomNav';
 import { LegalModal, LegalTab } from './components/legal/LegalModal';
+import { GuideModal } from './components/guide/GuideModal';
 import { PiPOverlay } from './components/pip/PiPOverlay';
-import { AdSenseBanner } from './components/ads/AdSenseBanner';
 import { IncompleteScheduleAlertModal } from './components/common/IncompleteScheduleAlertModal';
 import { 
   CharacterAlertStatus, 
@@ -68,9 +82,9 @@ import {
   evaluateAccountAlerts,
   getActiveAlertCycleKey 
 } from './utils/alertNotifier';
-import { Plus, SlidersHorizontal, Calendar, Flame, Crown, LayoutGrid, ShieldAlert } from 'lucide-react';
+import { Plus, SlidersHorizontal, Calendar, Flame, Crown, LayoutGrid, ShieldAlert, AlertTriangle, X, RefreshCw, ChevronLeft, Users, Package, BarChart3, Calculator } from 'lucide-react';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
-import { motion } from 'motion/react';
+import { motion, LayoutGroup } from 'motion/react';
 import { isWeb, isElectron, supportsPiP, LOCAL_STORAGE_DATA_KEY } from './utils/platform';
 
 const LOCAL_STORAGE_KEY = LOCAL_STORAGE_DATA_KEY;
@@ -93,7 +107,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   pip: {
     enabled: false,
-    opacity: 90,
+    opacity: 100,
     direction: 'horizontal',
     align: 'right',
     position: 'top',
@@ -106,7 +120,6 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export default function App() {
-  const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI;
   const [characters, setCharacters] = useState<CharacterInfo[]>([]);
   const [records, setRecords] = useState<Record<string, CharacterProgressRecord>>({});
   const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
@@ -132,16 +145,32 @@ export default function App() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>(() => getStoredApiKeys());
   const [lastUpdatedStr, setLastUpdatedStr] = useState<string>('');
   const [autoSyncCountdown, setAutoSyncCountdown] = useState<number>(300);
 
+  // 중앙 뷰 모드: 'schedule' (스케줄 페이지) | 'conversion' (환산 페이지)
+  const [mainViewMode, setMainViewMode] = useState<'schedule' | 'conversion'>('schedule');
   // 중앙 탭: 'all' | 'daily' | 'daily_boss' | 'weekly' | 'bosses' | 'custom'
   const [activeTab, setActiveTab] = useState<'all' | 'daily' | 'daily_boss' | 'weekly' | 'bosses' | 'custom'>('all');
   const [collapseTrigger, setCollapseTrigger] = useState<number>(0);
+  const [characterSelectTrigger, setCharacterSelectTrigger] = useState<number>(0);
+
+  // 모바일 전용 하단 탭 및 캐릭터 화면 서브 뷰 상태 (모바일 최초 접속 시 캐릭터 목록 화면 우선 노출)
+  const [mobileTab, setMobileTab] = useState<MobileTabType>('character');
+  const [mobileCharacterSubView, setMobileCharacterSubView] = useState<'detail' | 'list'>('list');
 
   const handleSelectCharacter = (id: string) => {
     setActiveCharacterId(id);
     setCollapseTrigger((prev) => prev + 1);
+    setCharacterSelectTrigger((prev) => prev + 1);
+    setMobileCharacterSubView('detail'); // 모바일에서 캐릭터 카드 탭 시 바로 해당 캐릭터 할 일로 전환!
+    // 메인 창 캐릭터 선택 즉시 로컬 스토리지 저장 및 PiP로 0ms 브로드캐스트
+    persistData(charactersRef.current, recordsRef.current, settingsRef.current, id, false);
+    // 데스크톱 Electron IPC 실시간 0ms 동기화
+    if ((window as any).electronAPI?.sendActiveCharacter) {
+      (window as any).electronAPI.sendActiveCharacter(id);
+    }
   };
 
   // 모달 상태
@@ -151,13 +180,139 @@ export default function App() {
   const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
   const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
   const [legalModalTab, setLegalModalTab] = useState<LegalTab>('terms');
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
   const [configCharacterId, setConfigCharacterId] = useState<string | null>(null);
   const [toastFeedback, setToastFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // 넥슨 Open API & 메이플 게임 서버 점검 상태 관리
+  const [maintenanceInfo, setMaintenanceInfo] = useState<{
+    isMaintenance: boolean;
+    type: NexonMaintenanceType;
+    badge: string;
+    message: string;
+  }>({
+    isMaintenance: false,
+    type: 'none',
+    badge: '',
+    message: '',
+  });
+  const [isMaintenanceBannerVisible, setIsMaintenanceBannerVisible] = useState<boolean>(false);
+  const [isCheckingMaintenance, setIsCheckingMaintenance] = useState<boolean>(false);
+
+  // 전역 점검 이벤트 구독 (API 호출 중 503 또는 500 감지 시 자동 반응)
+  useEffect(() => {
+    const handleMaintenanceEvent = (e: any) => {
+      const detail = e.detail;
+      if (!detail) return;
+      if (detail.type === 'api_maintenance') {
+        setMaintenanceInfo({
+          isMaintenance: true,
+          type: 'api_maintenance',
+          badge: 'API 점검 안내',
+          message: detail.message || '현재 넥슨 Open API 서버가 점검 중입니다.',
+        });
+        setIsMaintenanceBannerVisible(true);
+      } else if (detail.type === 'game_maintenance') {
+        setMaintenanceInfo({
+          isMaintenance: true,
+          type: 'game_maintenance',
+          badge: '게임 서버 점검/오류',
+          message: detail.message || '메이플스토리 게임 서버 점검 또는 넥슨 내부 통신 지연 중입니다.',
+        });
+        setIsMaintenanceBannerVisible(true);
+      } else if (detail.type === 'none') {
+        setMaintenanceInfo({
+          isMaintenance: false,
+          type: 'none',
+          badge: '',
+          message: '',
+        });
+        setIsMaintenanceBannerVisible(false);
+      }
+    };
+
+    window.addEventListener('mapleschedule:nexon_maintenance', handleMaintenanceEvent);
+    return () => {
+      window.removeEventListener('mapleschedule:nexon_maintenance', handleMaintenanceEvent);
+    };
+  }, []);
+
+  // 수동/자동 상태 점검 실행 핸들러
+  const handleCheckMaintenance = async (showSuccessToast = true) => {
+    setIsCheckingMaintenance(true);
+    try {
+      const res = await checkNexonServerStatus();
+      if (res.isMaintenance) {
+        if (res.type === 'api_maintenance') {
+          setMaintenanceInfo({
+            isMaintenance: true,
+            type: 'api_maintenance',
+            badge: 'API 점검 안내',
+            message: res.message || '현재 넥슨 Open API 서버가 점검 중입니다.',
+          });
+          setIsMaintenanceBannerVisible(true);
+          showToast('현재 넥슨 Open API 점검 중입니다.', 'error');
+        } else if (res.type === 'game_maintenance') {
+          setMaintenanceInfo({
+            isMaintenance: true,
+            type: 'game_maintenance',
+            badge: '게임 서버 점검/오류',
+            message: res.message || '메이플스토리 게임 서버 점검 또는 넥슨 내부 통신 지연 중입니다.',
+          });
+          setIsMaintenanceBannerVisible(true);
+          showToast('메이플스토리 게임 서버 점검 또는 통신 지연 중입니다.', 'error');
+        }
+      } else {
+        if (showSuccessToast) {
+          showToast('넥슨 API 및 게임 서버가 정상 연결 상태입니다.', 'success');
+        }
+        setMaintenanceInfo({
+          isMaintenance: false,
+          type: 'none',
+          badge: '',
+          message: '',
+        });
+        setIsMaintenanceBannerVisible(false);
+      }
+    } catch (_) {
+      if (showSuccessToast) {
+        showToast('서버 상태 확인을 완료했습니다.', 'success');
+      }
+    } finally {
+      setIsCheckingMaintenance(false);
+    }
+  };
+
+  // 앱 로딩 완료 후 1회 조용히 넥슨 서버 점검 여부 확인
+  useEffect(() => {
+    if (!isInitializing) {
+      handleCheckMaintenance(false);
+    }
+  }, [isInitializing]);
 
   const handleOpenLegalModal = (tab: LegalTab = 'terms') => {
     setLegalModalTab(tab);
     setIsLegalModalOpen(true);
   };
+
+  // URL 파라미터 또는 해시를 통한 가이드/약관 직접 열기 (구글 애드센스 봇 및 직접 링크 유입 대응)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const hash = window.location.hash;
+        const pathname = window.location.pathname;
+
+        if (params.get('guide') === 'true' || hash === '#guide' || pathname === '/guide') {
+          setIsGuideModalOpen(true);
+        } else if (params.get('privacy') === 'true' || hash === '#privacy' || pathname === '/privacy') {
+          handleOpenLegalModal('privacy');
+        } else if (params.get('terms') === 'true' || hash === '#terms' || pathname === '/terms') {
+          handleOpenLegalModal('terms');
+        }
+      } catch (_) {}
+    }
+  }, []);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToastFeedback({ message, type });
@@ -311,9 +466,22 @@ export default function App() {
       });
     }
 
+    // Electron 환경에서 PiP 창에서 캐릭터 선택 시 메인 창 즉각 0ms 동기화
+    let unsubscribeActiveChar: (() => void) | undefined;
+    if ((window as any).electronAPI?.onActiveCharacterChanged) {
+      unsubscribeActiveChar = (window as any).electronAPI.onActiveCharacterChanged((charId: string) => {
+        if (charId && charId !== activeCharacterIdRef.current) {
+          setActiveCharacterId(charId);
+          setCollapseTrigger((prev) => prev + 1);
+          setCharacterSelectTrigger((prev) => prev + 1);
+        }
+      });
+    }
+
     return () => {
       unsubscribe();
       if (unsubscribePiPClosed) unsubscribePiPClosed();
+      if (unsubscribeActiveChar) unsubscribeActiveChar();
     };
   }, [persistData]);
 
@@ -356,18 +524,11 @@ export default function App() {
         });
       }
 
-      // 주간 콘텐츠 초기화 (목요일 정기 리셋: 주간 퀘스트, 주간 보스, 지하 수로, 플래그 등 모든 주간 데이터 초기화)
+      // 주간 콘텐츠 초기화 (목요일 정기 리셋: 주간 퀘스트, 주간 보스, 지하 수로, 플래그, 무릉도장 등 모든 주간 데이터 초기화)
       if (isWeeklyThuResetNeeded) {
         Object.keys(newWeeklyTasks).forEach((k) => {
           delete newWeeklyTasks[k];
         });
-      }
-
-      // 주간 콘텐츠 중 일요일 리셋 항목 초기화 (일요일 23:59 리셋 대비)
-      if (isWeeklySunResetNeeded) {
-        delete newWeeklyTasks['weekly_mulung_dojang'];
-        delete newWeeklyTasks['weekly_sharenian_culvert'];
-        delete newWeeklyTasks['weekly_flag_race'];
       }
 
       updatedRecords[charId] = {
@@ -412,7 +573,7 @@ export default function App() {
       for (const pDate of missingDates) {
         try {
           // force=false로 하여 24시간 장기 캐시 적극 활용
-          const pastRes = await fetchNexonSchedulerState(char.ocid, false, pDate);
+          const pastRes = await fetchNexonSchedulerState(char.ocid, false, pDate, char.characterName, char.apiKeyId);
           if (pastRes.success && pastRes.data) {
             const completedBossIds = extractCompletedDailyBossIdsFromData(pastRes.data);
             currentWeeklyLog[pDate] = completedBossIds;
@@ -500,7 +661,7 @@ export default function App() {
             if (missingAvatarChars.length > 0) {
               const fetchTasks = missingAvatarChars.map(async (char) => {
                 try {
-                  const bRes = await fetchCharacterBasic({ ocid: char.ocid, name: char.characterName });
+                  const bRes = await fetchCharacterBasic({ ocid: char.ocid, name: char.characterName }, false, char.apiKeyId);
                   if (bRes.success && bRes.basic?.character_image) {
                     return {
                       id: char.id,
@@ -572,11 +733,6 @@ export default function App() {
             setSettings(initialData.settings || DEFAULT_SETTINGS);
             setActiveCharacterId(initialData.activeCharacterId || initialData.characters[0]?.id || null);
             setRecords(checkAndResetRecords(initialData.records || {}, initialData.characters));
-
-            // 로컬 스토리지 상에서 pip.enabled가 켜져 있으면 즉시 PiP 창 오픈
-            if (initialData.settings?.pip?.enabled && (window as any).electronAPI?.openPiPWindow) {
-              (window as any).electronAPI.openPiPWindow();
-            }
           }
         }
       } catch (e) {
@@ -667,11 +823,6 @@ export default function App() {
           setActiveCharacterId(loadedData.activeCharacterId || cleanedChars[0]?.id || null);
           setRecords(validatedRecords);
 
-          // Electron 환경에서 pip.enabled가 켜져 있으면 PiP 창 활성화
-          if (loadedData.settings?.pip?.enabled && (window as any).electronAPI?.openPiPWindow) {
-            (window as any).electronAPI.openPiPWindow();
-          }
-
           // 3. 백그라운드 비동기 아바타 보강 (메인 스레드 멈춤/지연 없음)
           if (hasKey) {
             const missingAvatarChars = loadedData.characters.filter(
@@ -680,7 +831,7 @@ export default function App() {
             if (missingAvatarChars.length > 0) {
               const fetchTasks = missingAvatarChars.map(async (char) => {
                 try {
-                  const bRes = await fetchCharacterBasic({ ocid: char.ocid, name: char.characterName });
+                  const bRes = await fetchCharacterBasic({ ocid: char.ocid, name: char.characterName }, false, char.apiKeyId);
                   if (bRes.success && bRes.basic?.character_image) {
                     return {
                       id: char.id,
@@ -733,6 +884,135 @@ export default function App() {
   }, []);
 
   // ----------------------------------------------------
+  // 실시간 API 키 변경 핸들러 및 구독
+  // 키 삭제 시 해당 API 키와 연동된 캐릭터 전체 일괄 삭제
+  // ----------------------------------------------------
+  const handleApplyUpdatedApiKeys = useCallback((hasKey: boolean, updatedKeys?: ApiKeyItem[]) => {
+    setHasApiKey(hasKey);
+    if (updatedKeys) {
+      setApiKeys(updatedKeys);
+      const validKeyIds = new Set(updatedKeys.map((k) => k.id));
+      const aliasMap = new Map(updatedKeys.map((k) => [k.id, k.alias]));
+
+      // 1. 등록된 API 키가 0개인 경우: 모든 캐릭터 및 진행도 기록 완전 삭제
+      if (updatedKeys.length === 0) {
+        setCharacters([]);
+        setRecords({});
+        setActiveCharacterId(null);
+        persistData([], {}, settingsRef.current, null, true);
+        try {
+          localStorage.removeItem('mapleschedule_common_content_ids');
+        } catch (_) {}
+        return;
+      }
+
+      // 2. API 키가 남아있는 경우:
+      // 삭제된 API 키에 소속된 캐릭터를 전부 삭제(filter)하고, 유효한 키에 소속된 캐릭터만 보존
+      const prevChars = charactersRef.current;
+      let changed = false;
+      const kept: CharacterInfo[] = [];
+
+      for (const c of prevChars) {
+        if (c.apiKeyId) {
+          if (validKeyIds.has(c.apiKeyId)) {
+            // 유효한 키에 소속된 캐릭터: 보존 및 최신 별칭 동기화
+            const newAlias = aliasMap.get(c.apiKeyId);
+            if (newAlias && c.apiKeyAlias !== newAlias) {
+              changed = true;
+              kept.push({ ...c, apiKeyAlias: newAlias });
+            } else {
+              kept.push(c);
+            }
+          } else {
+            // 소속된 API 키가 삭제된 캐릭터: 완전 삭제
+            changed = true;
+          }
+        } else {
+          // apiKeyId가 없는 레거시 캐릭터: 유효 키가 정확히 1개일 때만 자동 연결하여 보존, 아니면 삭제
+          if (updatedKeys.length === 1) {
+            changed = true;
+            kept.push({
+              ...c,
+              apiKeyId: updatedKeys[0].id,
+              apiKeyAlias: updatedKeys[0].alias,
+            });
+          } else {
+            changed = true;
+          }
+        }
+      }
+
+      // 삭제된 API 키의 계정 공통 컨텐츠 맞춤 설정 정리
+      try {
+        const commonMap = getStoredCommonContentsMap();
+        Object.keys(commonMap).forEach((kId) => {
+          if (kId !== 'default' && !validKeyIds.has(kId)) {
+            removeStoredCommonContentId(kId);
+          }
+        });
+      } catch (_) {}
+
+      if (changed) {
+        // 삭제된 캐릭터들의 진행 기록(records) 정리
+        const keptIds = new Set(kept.map((c) => c.id));
+        const currentRecords = recordsRef.current;
+        let recordsChanged = false;
+        const nextRecords: Record<string, CharacterProgressRecord> = {};
+        for (const cid of Object.keys(currentRecords)) {
+          if (keptIds.has(cid) && currentRecords[cid]) {
+            nextRecords[cid] = currentRecords[cid];
+          } else {
+            recordsChanged = true;
+          }
+        }
+
+        // 활성 캐릭터가 삭제되었으면 첫 번째 남은 캐릭터로 전환하거나 null 처리
+        let nextActiveId = activeCharacterIdRef.current;
+        let activeChanged = false;
+        if (nextActiveId && !keptIds.has(nextActiveId)) {
+          nextActiveId = kept[0]?.id || null;
+          activeChanged = true;
+        }
+
+        setCharacters(kept);
+        if (recordsChanged) {
+          setRecords(nextRecords);
+        }
+        if (activeChanged) {
+          setActiveCharacterId(nextActiveId);
+        }
+
+        persistData(kept, recordsChanged ? nextRecords : currentRecords, settingsRef.current, nextActiveId, true);
+      }
+    }
+  }, [persistData]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchApiKeys().then((res: any) => {
+      const keys = Array.isArray(res) ? res : res?.keys;
+      if (isMounted && Array.isArray(keys)) {
+        setApiKeys(keys);
+        setHasApiKey(keys.length > 0);
+        try {
+          localStorage.setItem('mapleschedule_cached_apikeys_v1', JSON.stringify(keys));
+        } catch (_) {}
+      }
+    }).catch(() => {});
+
+    const unsubscribe = subscribeToApiKeys((updatedKeys) => {
+      if (isMounted && Array.isArray(updatedKeys)) {
+        handleApplyUpdatedApiKeys(updatedKeys.length > 0, updatedKeys);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [handleApplyUpdatedApiKeys]);
+
+  // ----------------------------------------------------
   // 알림이 (초기화 임박 알림) 평가 및 팝업 트리거
   // ----------------------------------------------------
   useEffect(() => {
@@ -761,7 +1041,8 @@ export default function App() {
         }
       }
 
-      const accAlert = evaluateAccountAlerts(characters, records, activeMap, settings);
+      const activeChar = characters.find((c) => c.id === activeCharacterId);
+      const accAlert = evaluateAccountAlerts(characters, records, activeMap, settings, activeChar?.apiKeyId);
 
       setCharacterAlertMap(newMap);
       setIncompleteAlertList(newIncomplete);
@@ -821,7 +1102,7 @@ export default function App() {
         if (char.ocid && !char.ocid.startsWith('manual_')) {
           try {
             // 캐릭터 기본 정보 최신화 (레벨업, 코디/프로필 사진 변경 실시간 반영, 월드리프 시 OCID/월드 자동 치유)
-            const bRes = await fetchCharacterBasic({ ocid: char.ocid, name: char.characterName }, true);
+            const bRes = await fetchCharacterBasic({ ocid: char.ocid, name: char.characterName }, true, char.apiKeyId);
             let activeOcid = char.ocid;
 
             if (bRes.success && bRes.basic) {
@@ -840,7 +1121,8 @@ export default function App() {
                 newLevel !== char.characterLevel ||
                 newClass !== char.characterClass ||
                 newWorld !== char.worldName ||
-                newOcid !== char.ocid
+                newOcid !== char.ocid ||
+                char.syncError
               ) {
                 updatedChars[i] = {
                   ...char,
@@ -849,12 +1131,24 @@ export default function App() {
                   characterLevel: newLevel,
                   characterClass: newClass,
                   worldName: newWorld,
+                  syncError: false,
+                  syncErrorMessage: undefined,
+                };
+                hasCharUpdate = true;
+              }
+            } else if (!bRes.success) {
+              // 닉네임 변경이나 서버 이전 등으로 OCID 재발급까지 실패한 경우
+              if (!char.syncError) {
+                updatedChars[i] = {
+                  ...char,
+                  syncError: true,
+                  syncErrorMessage: bRes.error || '캐릭터 정보를 찾을 수 없습니다. (닉네임/서버 변경 확인 필요)',
                 };
                 hasCharUpdate = true;
               }
             }
 
-            const schedRes = await fetchNexonSchedulerState(activeOcid, true, undefined, char.characterName);
+            const schedRes = await fetchNexonSchedulerState(activeOcid, true, undefined, char.characterName, char.apiKeyId);
             if (schedRes.newOcid && schedRes.newOcid !== updatedChars[i].ocid) {
               updatedChars[i] = {
                 ...updatedChars[i],
@@ -886,7 +1180,9 @@ export default function App() {
                 updatedChars[i].enabledTaskIds,
                 updatedChars[i].selectedBossIds,
                 updatedChars[i].selectedDailyBossIds,
-                updatedChars[i].selectedBlackMageId
+                updatedChars[i].selectedBlackMageId,
+                updatedChars[i].worldName,
+                updatedChars[i].apiKeyId
               );
 
               // 검은 마법사는 주간/일일 보스와 마찬가지로 미선택 처치 보스로 정상 표시되므로 selectedBlackMageId 강제 할당 불필요
@@ -903,6 +1199,31 @@ export default function App() {
           }
         }
       }
+
+      // 계정별 몬스터파크 공통 완료 상태 전체 캐릭터 일괄 정합성 동기화
+      // (한 계정 내에서 어느 월드든 합산 2회 이상이거나 API 공인 완료된 경우 해당 계정 캐릭터 모두에게 완료 반영)
+      const allAccountKeyIds = new Set(updatedChars.map((c) => c.apiKeyId || 'default'));
+      allAccountKeyIds.forEach((kId) => {
+        const isVerified = isAccountMonsterParkApiVerified(kId);
+        const totalCount = getAccountMonsterParkTotalCount(kId);
+        if (isVerified || totalCount >= 2) {
+          const nowStr = new Date().toISOString();
+          updatedChars
+            .filter((c) => (c.apiKeyId || 'default') === kId)
+            .forEach((c) => {
+              const rec = currentRecords[c.id];
+              if (rec && rec.dailyTasks) {
+                rec.dailyTasks['daily_monster_park'] = {
+                  completed: true,
+                  currentCount: Math.max(totalCount, rec.dailyTasks['daily_monster_park']?.currentCount || 2),
+                  maxCount: 7,
+                  completedAt: rec.dailyTasks['daily_monster_park']?.completedAt || nowStr,
+                  autoSynced: true,
+                };
+              }
+            });
+        }
+      });
 
       setRecords(currentRecords);
       if (hasCharUpdate) {
@@ -1020,7 +1341,13 @@ export default function App() {
     });
   };
 
-  const handleToggleCommonTask = (taskId: string, completed: boolean, count?: number) => {
+  const handleToggleCommonTask = (
+    taskId: string,
+    completed: boolean,
+    count?: number,
+    targetApiKeyId?: string,
+    targetCharacterId?: string
+  ) => {
     if (completed && settings.soundEnabled) {
       playCheckSound();
     }
@@ -1032,8 +1359,25 @@ export default function App() {
       const weeklyThuKey = getKSTWeeklyThuKey();
       const weeklySunKey = getKSTWeeklySunKey();
 
-      // 계정 공통 태스크는 모든 캐릭터에 걸쳐 일관되게 토글/해제
-      characters.forEach((char) => {
+      // 대상 계정 키(apiKeyId) 결정: targetApiKeyId -> targetCharacterId 기준 -> activeCharacter 기준
+      let resolvedApiKeyId = targetApiKeyId;
+      if (!resolvedApiKeyId && targetCharacterId) {
+        const c = characters.find((char) => char.id === targetCharacterId);
+        if (c) resolvedApiKeyId = c.apiKeyId;
+      }
+      if (!resolvedApiKeyId && activeCharacterId) {
+        const c = characters.find((char) => char.id === activeCharacterId);
+        if (c) resolvedApiKeyId = c.apiKeyId;
+      }
+
+      // 등록된 apiKeyId가 존재하는 다중 계정 환경인 경우, 동일 apiKeyId를 가진 캐릭터들만 업데이트
+      // 다른 계정에 속한 캐릭터들의 레코드는 완벽히 보존
+      const hasAnyApiKey = characters.some((c) => !!c.apiKeyId);
+      const targetChars = (hasAnyApiKey && resolvedApiKeyId)
+        ? characters.filter((c) => c.apiKeyId === resolvedApiKeyId)
+        : characters;
+
+      targetChars.forEach((char) => {
         const charId = char.id;
         const currentRec = nextRecords[charId] || {
           characterId: charId,
@@ -1050,13 +1394,14 @@ export default function App() {
         const updatedWeekly = { ...currentRec.weeklyTasks };
 
         if (taskId === 'daily_monster_park') {
+          // 사용자의 수동 체크/체크해제 조작 즉각 반영
+          // (수동 해제 시 false로 풀리며, 이후 새로고침(동기화) 시 API 데이터 및 공인 상태에 따라 다시 체크됨)
           const nextCount = count !== undefined ? count : completed ? 2 : 0;
-          const isDone = completed || nextCount >= 2;
           updatedDaily['daily_monster_park'] = {
-            completed: isDone,
+            completed,
             currentCount: nextCount,
             maxCount: 7,
-            completedAt: isDone ? nowStr : undefined,
+            completedAt: completed ? nowStr : undefined,
           };
         } else {
           updatedWeekly[taskId] = {
@@ -1374,7 +1719,13 @@ export default function App() {
     // 캐릭터 등록 시 인게임 스케줄러 상태 및 진행/완료 기록을 즉시 가져와 반영
     if (formattedChar.ocid && !formattedChar.ocid.startsWith('manual_')) {
       try {
-        const schedRes = await fetchNexonSchedulerState(formattedChar.ocid, true);
+        const schedRes = await fetchNexonSchedulerState(
+          formattedChar.ocid,
+          true,
+          undefined,
+          formattedChar.characterName,
+          formattedChar.apiKeyId
+        );
         if (schedRes.success && schedRes.data) {
           if (!formattedChar.selectedBlackMageId) {
             const { selectedBlackMageId } = extractInGameRegisteredTasks(schedRes.data);
@@ -1388,7 +1739,9 @@ export default function App() {
             formattedChar.enabledTaskIds,
             formattedChar.selectedBossIds,
             formattedChar.selectedDailyBossIds,
-            formattedChar.selectedBlackMageId
+            formattedChar.selectedBlackMageId,
+            formattedChar.worldName,
+            formattedChar.apiKeyId
           );
           initialRecord = updatedRecord;
         }
@@ -1434,7 +1787,7 @@ export default function App() {
       c.id === id ? { ...c, favorite: !c.favorite } : c
     );
     setCharacters(nextChars);
-    persistData(nextChars, records, settings, activeCharacterId);
+    persistData(nextChars, records, settings, activeCharacterId, true);
   };
 
   const handleMoveCharacter = (id: string, direction: 'up' | 'down', e: React.MouseEvent) => {
@@ -1519,13 +1872,38 @@ export default function App() {
     persistData(characters, records, next, activeCharacterId);
   };
 
+  // PiP 모드 토글 (데스크톱 및 웹 겸용)
+  const handleTogglePip = () => {
+    const nextEnabled = !settings.pip?.enabled;
+    handleUpdateSettings({
+      pip: {
+        ...settings.pip,
+        enabled: nextEnabled,
+      },
+    });
+  };
+
   const handleExportData = () => {
+    // 현재 등록된 API 키 목록 조회
+    const currentKeys = getStoredApiKeys();
+    
+    // 계정 공통 컨텐츠 ID 목록 조회
+    let commonIds: string[] = [];
+    try {
+      const rawCommon = localStorage.getItem('mapleschedule_common_content_ids');
+      if (rawCommon) {
+        commonIds = JSON.parse(rawCommon);
+      }
+    } catch (_) {}
+
     const payload: AppDataPayload = {
       characters,
       records,
       settings,
       activeCharacterId,
       lastServerSync: new Date().toISOString(),
+      apiKeys: currentKeys,
+      commonContentIds: commonIds,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1534,6 +1912,7 @@ export default function App() {
     a.download = `메이플스토리_스케줄러_백업_${getKSTDailyKey()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    showToast('데이터 백업 파일이 다운로드되었습니다.', 'success');
   };
 
   const handleImportData = (file: File) => {
@@ -1542,12 +1921,38 @@ export default function App() {
       try {
         const json = JSON.parse(e.target?.result as string) as AppDataPayload;
         if (json.characters && Array.isArray(json.characters)) {
+          // 1. 캐릭터, 기록, 설정, 활성 캐릭터 복원
           setCharacters(json.characters);
           setRecords(json.records || {});
           setSettings(json.settings || DEFAULT_SETTINGS);
-          setActiveCharacterId(json.activeCharacterId || json.characters[0]?.id || null);
-          await persistData(json.characters, json.records || {}, json.settings || DEFAULT_SETTINGS, json.activeCharacterId || null);
-          showToast('데이터 복원이 성공적으로 완료되었습니다.', 'success');
+          const nextActiveId = json.activeCharacterId || json.characters[0]?.id || null;
+          setActiveCharacterId(nextActiveId);
+
+          // 2. 계정 공통 컨텐츠 ID 복원
+          if (Array.isArray(json.commonContentIds)) {
+            try {
+              localStorage.setItem('mapleschedule_common_content_ids', JSON.stringify(json.commonContentIds));
+            } catch (_) {}
+          }
+
+          // 3. 넥슨 API 키 목록 복원 (백업 파일에 포함되어 있을 경우 100% 완전 복원)
+          if (Array.isArray(json.apiKeys) && json.apiKeys.length > 0) {
+            try {
+              await restoreApiKeys(json.apiKeys);
+              setApiKeys(json.apiKeys);
+              setHasApiKey(true);
+            } catch (keyErr) {
+              console.warn('API 키 복원 중 경고:', keyErr);
+            }
+          }
+
+          // 4. 로컬스토리지 및 데스크톱 스토리지 영구 반영
+          await persistData(json.characters, json.records || {}, json.settings || DEFAULT_SETTINGS, nextActiveId);
+
+          const keyCountMsg = Array.isArray(json.apiKeys) && json.apiKeys.length > 0 
+            ? ` (API 키 ${json.apiKeys.length}개 포함)` 
+            : '';
+          showToast(`데이터 복원이 성공적으로 완료되었습니다.${keyCountMsg}`, 'success');
         } else {
           showToast('유효하지 않은 백업 파일 형식입니다.', 'error');
         }
@@ -1625,7 +2030,7 @@ export default function App() {
   }
 
   return (
-    <div className={`h-screen w-screen flex flex-col overflow-hidden ${settings.darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-[#F8F9FB] text-slate-800'}`}>
+    <div className={`h-[100dvh] lg:h-screen w-screen flex flex-col overflow-hidden ${settings.darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-[#F8F9FB] text-slate-800'}`}>
       {/* 1. 상단 Windows 헤더 */}
       <WindowHeader
         characters={characters}
@@ -1644,96 +2049,246 @@ export default function App() {
         autoSyncIntervalSec={settings.autoSyncIntervalSec || 300}
       />
 
-      {/* 2. 메인 3분할 뷰 */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-[#F8F9FB] dark:bg-slate-950 min-h-0 min-w-0">
-        {/* 좌측 사이드바: 캐릭터 목록 */}
-        <CharacterSidebar
-          characters={characters}
-          records={records}
-          activeCharacterId={activeCharacterId}
-          settings={settings}
-          characterAlertMap={characterAlertMap}
-          onSelectCharacter={handleSelectCharacter}
-          onOpenAddModal={() => setIsAddModalOpen(true)}
-          onToggleFavorite={handleToggleFavorite}
-          onMoveCharacter={handleMoveCharacter}
-          onDeleteCharacter={handleDeleteCharacter}
-          onOpenContentConfig={(id, e) => {
-            e.stopPropagation();
-            setConfigCharacterId(id);
-          }}
-          onSelectTab={(tab) => setActiveTab(tab)}
-          onOpenLegalModal={handleOpenLegalModal}
-        />
+      {/* 넥슨 Open API (503) & 메이플 게임 서버 (500) 점검 안내 배너 */}
+      {isMaintenanceBannerVisible && maintenanceInfo.isMaintenance && (
+        <div 
+          className={`w-full border-b px-4 py-2 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-1 duration-200 z-30 select-none ${
+            maintenanceInfo.type === 'game_maintenance'
+              ? 'bg-gradient-to-r from-rose-500/15 via-orange-500/10 to-rose-500/15 border-rose-500/30 text-rose-950 dark:text-rose-200'
+              : 'bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-amber-500/30 text-amber-950 dark:text-amber-200'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span 
+              className={`p-1 rounded-md flex-shrink-0 ${
+                maintenanceInfo.type === 'game_maintenance'
+                  ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                  : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+              }`}
+            >
+              <AlertTriangle className="w-4 h-4 animate-pulse" />
+            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span 
+                className={`px-2 py-0.5 rounded-full font-bold text-[10px] tracking-wide ${
+                  maintenanceInfo.type === 'game_maintenance'
+                    ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300'
+                    : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                }`}
+              >
+                {maintenanceInfo.badge || (maintenanceInfo.type === 'game_maintenance' ? '게임 서버 점검/오류' : 'API 점검 안내')}
+              </span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {maintenanceInfo.message || (maintenanceInfo.type === 'game_maintenance' ? '메이플스토리 게임 서버 점검 또는 넥슨 내부 통신 지연 중입니다.' : '현재 넥슨 Open API 서버가 점검 중입니다.')}
+              </span>
+              <span className="text-slate-600 dark:text-slate-400 text-[11px] hidden sm:inline">
+                점검 중에도 일일/주간 숙제 수동 체크, 캐릭터 관리 및 메모 기능은 안전하게 100% 정상 작동합니다.
+              </span>
+            </div>
+          </div>
 
-        {/* 중앙: 선택된 캐릭터의 콘텐츠 관리 영역 */}
+          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+            {/* 상태 재확인 버튼 */}
+            <button
+              type="button"
+              onClick={() => handleCheckMaintenance(true)}
+              disabled={isCheckingMaintenance}
+              className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs disabled:opacity-50 ${
+                maintenanceInfo.type === 'game_maintenance'
+                  ? 'bg-white/80 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 border-rose-500/30 text-rose-800 dark:text-rose-300'
+                  : 'bg-white/80 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 border-amber-500/30 text-amber-800 dark:text-amber-300'
+              }`}
+              title="API 상태 재확인"
+            >
+              <RefreshCw className={`w-3 h-3 ${isCheckingMaintenance ? 'animate-spin' : ''}`} />
+              <span>{isCheckingMaintenance ? '확인 중...' : '상태 재확인'}</span>
+            </button>
+
+            {/* 닫기 버튼 */}
+            <button
+              type="button"
+              onClick={() => setIsMaintenanceBannerVisible(false)}
+              className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+              title="안내 닫기"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. 메인 뷰 (데스크톱: 3분할 가로 정렬 / 모바일: 하단 탭에 따른 단일 전체화면 뷰) */}
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-[#F8F9FB] dark:bg-slate-950 min-h-0 min-w-0 relative">
+        {/* 좌측 사이드바: 캐릭터 목록 (모바일에서는 '캐릭터' 탭의 '목록' 상태일 때 전체 화면으로 표시되며 위아래 스크롤 지원) */}
+        <div className={`
+          ${mobileTab === 'character' && (mobileCharacterSubView === 'list' || !activeCharacter) ? 'flex' : 'hidden'} 
+          lg:flex lg:w-72 lg:min-w-[280px] lg:max-w-[288px] flex-col flex-shrink-0 h-full overflow-hidden w-full
+        `}>
+          <CharacterSidebar
+            characters={characters}
+            records={records}
+            activeCharacterId={activeCharacterId}
+            apiKeys={apiKeys}
+            settings={settings}
+            characterAlertMap={characterAlertMap}
+            onSelectCharacter={handleSelectCharacter}
+            onOpenAddModal={() => setIsAddModalOpen(true)}
+            onToggleFavorite={handleToggleFavorite}
+            onMoveCharacter={handleMoveCharacter}
+            onDeleteCharacter={handleDeleteCharacter}
+            onOpenContentConfig={(id, e) => {
+              e.stopPropagation();
+              setConfigCharacterId(id);
+            }}
+            onSelectTab={(tab) => {
+              setActiveTab(tab);
+              setMainViewMode('schedule');
+              setMobileCharacterSubView('detail');
+            }}
+            onOpenLegalModal={handleOpenLegalModal}
+            onOpenGuideModal={() => setIsGuideModalOpen(true)}
+          />
+        </div>
+
+        {/* 중앙: 선택된 캐릭터의 콘텐츠 관리 영역 (모바일에서는 '캐릭터' 탭의 '상세' 상태일 때 전체 화면 표시) */}
         <section 
           id="main-content-section" 
-          className="flex-1 flex flex-col bg-[#F8F9FB] dark:bg-slate-950 overflow-hidden min-h-0 min-w-0"
+          className={`
+            ${mobileTab === 'character' && mobileCharacterSubView === 'detail' && activeCharacter ? 'flex' : 'hidden'}
+            lg:flex flex-1 flex-col bg-[#F8F9FB] dark:bg-slate-950 overflow-hidden min-h-0 min-w-0 h-full pb-0
+          `}
         >
+          {/* 모바일 전용 상단 캐릭터 전환 미니 바: 캐릭터 목록으로 돌아가기 버튼 + 현재 캐릭터 정보 + 스케줄 설정 버튼 */}
+          {activeCharacter && (
+            <div className="lg:hidden px-3.5 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 flex-shrink-0 shadow-2xs">
+              <button
+                type="button"
+                id="btn-mobile-back-to-char-list"
+                onClick={() => setMobileCharacterSubView('list')}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border border-orange-200/80 dark:border-orange-800 text-xs font-bold active:scale-95 transition-all shadow-2xs cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>캐릭터 목록</span>
+              </button>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                  {activeCharacter.characterName}
+                </span>
+                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                  Lv.{activeCharacter.characterLevel}
+                </span>
+                <button
+                  type="button"
+                  id="btn-mobile-schedule-config"
+                  onClick={() => setConfigCharacterId(activeCharacter.id)}
+                  className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-orange-500 active:scale-95 transition-all cursor-pointer"
+                  title="스케줄 설정"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
           {activeCharacter ? (
             (() => {
               const activeCharAlert = characterAlertMap[activeCharacter.id];
               return (
             <div className="flex-1 flex flex-col overflow-hidden min-h-0 min-w-0">
-              {/* 중앙 상단: 탭 헤더 (가로 한 줄 고정 정렬 & 마우스 휠 가로 스크롤 지원) */}
+              {/* 중앙 상단: 탭 헤더 (데스크톱 전용: 가로 한 줄 고정 정렬 & 마우스 휠 가로 스크롤 지원 / 모바일에서는 요청에 따라 숨김) */}
               <div 
                 ref={tabScrollRef}
                 onWheel={handleTabWheel}
-                className="px-5 sm:px-6 py-3.5 bg-[#F8F9FB] dark:bg-slate-950 flex items-center justify-between gap-3 flex-shrink-0 overflow-x-auto custom-scrollbar"
+                className="hidden lg:flex px-5 sm:px-6 py-3.5 bg-[#F8F9FB] dark:bg-slate-950 items-center justify-between gap-3 flex-shrink-0 overflow-x-auto custom-scrollbar"
               >
                 <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
                   {/* 한국어 탭 세그먼트 버튼 (부드러운 슬라이딩 모션 전환) */}
-                  <div className="flex bg-white dark:bg-slate-900 rounded-xl p-1 border border-slate-200 dark:border-slate-800 shadow-xs flex-shrink-0 relative">
-                    {[
-                      { id: 'all', label: '전체', icon: LayoutGrid, activeBg: 'bg-orange-500', activeText: 'text-white' },
-                      { id: 'daily', label: '일일 컨텐츠', icon: Calendar, activeBg: 'bg-amber-500', activeText: 'text-white' },
-                      { id: 'daily_boss', label: '일일 보스', icon: Crown, activeBg: 'bg-sky-600', activeText: 'text-white' },
-                      { id: 'weekly', label: '주간 컨텐츠', icon: Flame, activeBg: 'bg-rose-700', activeText: 'text-white' },
-                      { id: 'bosses', label: '주간 보스', icon: Crown, activeBg: 'bg-purple-600', activeText: 'text-white' },
-                      { id: 'custom', label: '커스텀', icon: Plus, activeBg: 'bg-black dark:bg-white', activeText: 'text-white dark:text-black' },
-                    ].map((tab) => {
-                      const isActive = activeTab === tab.id;
-                      const Icon = tab.icon;
-                      return (
-                        <button
-                          key={tab.id}
-                          id={`tab-btn-${tab.id}`}
-                          onClick={() => setActiveTab(tab.id as any)}
-                          className={`relative px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer z-10 select-none ${
-                            isActive
-                              ? tab.activeText
-                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
-                          }`}
-                        >
-                          {isActive && (
-                            <motion.div
-                              layoutId="mainActiveTabPill"
-                              className={`absolute inset-0 rounded-lg shadow-xs -z-10 ${tab.activeBg}`}
-                              transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                            />
-                          )}
-                          <Icon className="w-3.5 h-3.5 relative z-10" />
-                          <span className="relative z-10">{tab.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <LayoutGroup id="mainTabsGroup">
+                    <div className="flex bg-white dark:bg-slate-900 rounded-xl p-1 border border-slate-200 dark:border-slate-800 shadow-xs flex-shrink-0 relative">
+                      {[
+                        { id: 'all', label: '전체', icon: LayoutGrid, activeBg: 'bg-orange-500', activeText: 'text-white' },
+                        { id: 'daily', label: '일일 컨텐츠', icon: Calendar, activeBg: 'bg-amber-500', activeText: 'text-white' },
+                        { id: 'daily_boss', label: '일일 보스', icon: Crown, activeBg: 'bg-sky-600', activeText: 'text-white' },
+                        { id: 'weekly', label: '주간 컨텐츠', icon: Flame, activeBg: 'bg-rose-700', activeText: 'text-white' },
+                        { id: 'bosses', label: '주간 보스', icon: Crown, activeBg: 'bg-purple-600', activeText: 'text-white' },
+                        { id: 'custom', label: '커스텀', icon: Plus, activeBg: 'bg-black dark:bg-white', activeText: 'text-white dark:text-black' },
+                      ].map((tab) => {
+                        const isActive = mainViewMode === 'schedule' && activeTab === tab.id;
+                        const Icon = tab.icon;
+                        return (
+                          <button
+                            key={tab.id}
+                            id={`tab-btn-${tab.id}`}
+                            onClick={() => {
+                              setActiveTab(tab.id as any);
+                              setMainViewMode('schedule');
+                            }}
+                            className={`relative px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer z-10 select-none ${
+                              isActive
+                                ? tab.activeText
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
+                            }`}
+                          >
+                            {isActive && (
+                              <motion.div
+                                layoutId="mainActiveTabPill"
+                                className={`absolute inset-0 rounded-lg shadow-xs -z-10 ${tab.activeBg}`}
+                                transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                              />
+                            )}
+                            <Icon className="w-3.5 h-3.5 relative z-10" />
+                            <span className="relative z-10">{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </LayoutGroup>
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* 환산 버튼 (데스크톱 전용: 웹 빌드 시 트리쉐이킹으로 코드 자체 100% 제거) */}
+                  {__DESKTOP_SCOUTER_ENABLED__ && (
+                    <button
+                      type="button"
+                      id="btn-scouter-conversion"
+                      onClick={() => {
+                        setMainViewMode((prev) => (prev === 'conversion' ? 'schedule' : 'conversion'));
+                      }}
+                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer active:scale-95 ${
+                        mainViewMode === 'conversion'
+                          ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-500 shadow-sm'
+                          : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
+                      }`}
+                    >
+                      <Calculator className={`w-3.5 h-3.5 ${mainViewMode === 'conversion' ? 'text-white' : 'text-orange-500'}`} />
+                      <span>환산</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => setConfigCharacterId(activeCharacter.id)}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
+                    title="캐릭터별 컨텐츠 및 보스 표시 설정"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5 text-orange-500" />
-                    <span>스케줄 설정</span>
+                    <span>설정</span>
                   </button>
                 </div>
               </div>
 
-              {/* 스크롤 가능한 콘텐츠 뷰 (스크롤바 표시 시 크기 흔들림 방지) */}
-              <div className="flex-1 overflow-y-scroll p-4 sm:p-6 space-y-6 custom-scrollbar [scrollbar-gutter:stable]">
+              {/* 환산 페이지 뷰 or 스케줄 목록 뷰 조건부 렌더링 (웹 빌드 시 완전 증발) */}
+              {__DESKTOP_SCOUTER_ENABLED__ && mainViewMode === 'conversion' ? (
+                <ConversionPageView 
+                  character={activeCharacter} 
+                  onUpdateCharacter={(updatedChar) => {
+                    const nextChars = characters.map((c) => (c.id === updatedChar.id ? updatedChar : c));
+                    setCharacters(nextChars);
+                    charactersRef.current = nextChars;
+                    persistData(nextChars, recordsRef.current, settingsRef.current, activeCharacterId);
+                  }}
+                />
+              ) : (
+                /* 스크롤 가능한 콘텐츠 뷰 (모바일 브라우저 하단 툴바 및 하단바 가림 방지 여유 공간 확보) */
+                <div className="flex-1 overflow-y-scroll p-4 sm:p-6 space-y-6 custom-scrollbar [scrollbar-gutter:stable] pb-[calc(env(safe-area-inset-bottom,0px)+5rem)] lg:pb-6">
                 {(activeTab === 'all' || activeTab === 'daily') && (
                   <DailyTaskList
                     key={`${activeCharacter.id}-${collapseTrigger}-daily`}
@@ -1818,6 +2373,7 @@ export default function App() {
                   />
                 )}
               </div>
+              )}
             </div>
               );
             })()
@@ -1843,25 +2399,45 @@ export default function App() {
               </button>
             </div>
           )}
-
-          {/* [웹 전용] 구글 애드센스 광고 영역 - 캐릭터 유무와 상관없이 중앙 하단 고정 (데스크톱 앱에서는 비표시) */}
-          <AdSenseBanner />
         </section>
 
-        {/* 우측 진행률 패널 */}
-        <ProgressPanel
-          characters={characters}
-          records={records}
-          activeCharacter={activeCharacter}
-          onRefresh={handleRefresh}
-          isRefreshing={isRefreshing}
-          autoSyncCountdown={autoSyncCountdown}
-          onToggleCommonTask={handleToggleCommonTask}
-          settings={settings}
-          accountAlertStatus={accountAlertStatus}
-          onUpdateSettings={handleUpdateSettings}
-        />
+        {/* 우측 진행률 패널 / 계정 컨텐츠 (모바일: '계정 컨텐츠' 또는 '진행 현황' 탭일 때 전체 화면 표시) */}
+        <div className={`
+          ${mobileTab === 'common' || mobileTab === 'progress' ? 'flex' : 'hidden'}
+          lg:flex lg:w-80 flex-col flex-shrink-0 h-full overflow-hidden w-full pb-0
+        `}>
+          <ProgressPanel
+            characters={characters}
+            records={records}
+            activeCharacter={activeCharacter}
+            apiKeys={apiKeys}
+            characterSelectTrigger={characterSelectTrigger}
+            onRefresh={handleRefresh}
+            isRefreshing={isRefreshing}
+            autoSyncCountdown={autoSyncCountdown}
+            onToggleCommonTask={handleToggleCommonTask}
+            settings={settings}
+            accountAlertStatus={accountAlertStatus}
+            onUpdateSettings={handleUpdateSettings}
+            mobileMode={mobileTab === 'common' ? 'common' : mobileTab === 'progress' ? 'progress' : 'all'}
+          />
+        </div>
       </main>
+
+      {/* 3. 모바일 웹 전용 하단 고정 네비게이션 바 (데스크톱에서는 lg:hidden으로 완전 숨김) */}
+      <MobileBottomNav
+        activeTab={mobileTab}
+        onChangeTab={(tab) => {
+          if (tab === 'character' && mobileTab === 'character') {
+            setMobileCharacterSubView('list');
+          }
+          setMobileTab(tab);
+          if (tab === 'character' && !activeCharacter) {
+            setMobileCharacterSubView('list');
+          }
+        }}
+        characterCount={characters.length}
+      />
 
       {/* 모달 컴포넌트들 */}
       <CharacterSearchModal
@@ -1870,6 +2446,7 @@ export default function App() {
         onAddCharacter={handleAddCharacter}
         existingCharacters={characters}
         hasApiKey={hasApiKey}
+        apiKeys={apiKeys}
         onOpenApiKeyModal={() => {
           setIsAddModalOpen(false);
           setIsApiKeyModalOpen(true);
@@ -1902,15 +2479,20 @@ export default function App() {
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}
-        onKeyUpdated={(hasKey) => {
-          setHasApiKey(hasKey);
-        }}
+        onKeyUpdated={handleApplyUpdatedApiKeys}
       />
 
       {/* 공지사항 모달 (API 버튼 옆 확성기 아이콘 클릭 시 표시) */}
       <NoticeModal
         isOpen={isNoticeModalOpen}
         onClose={() => setIsNoticeModalOpen(false)}
+      />
+
+      {/* 이용 가이드 모달 */}
+      <GuideModal
+        isOpen={isGuideModalOpen}
+        onClose={() => setIsGuideModalOpen(false)}
+        onOpenLegal={handleOpenLegalModal}
       />
 
       {/* 이용약관 및 개인정보처리방침 법적 고지 모달 */}
@@ -1942,8 +2524,8 @@ export default function App() {
         onSelectCharacter={handleSelectCharacter}
       />
 
-      {/* 웹 환경 전용 인앱 PiP 오버레이 (데스크톱 Electron 환경에서는 별도 독립 윈도우로 뜨므로 메인 창에는 렌더링하지 않음) */}
-      {!isElectron && settings.pip?.enabled && (
+      {/* 웹 환경 전용 인앱 PiP 오버레이 (임시 웹 PiP 숨김 처리: 데스크톱만 지원하도록 보호하며 코드는 100% 보존) */}
+      {supportsPiP && !isElectron && settings.pip?.enabled && (
         <PiPOverlay
           characters={characters}
           records={records}

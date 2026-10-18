@@ -33,12 +33,12 @@ export const DAILY_OTHER: TaskItem[] = [
 ];
 
 export const WEEKLY_QUESTS: TaskItem[] = [
-  { id: 'weekly_arcane_vanishing', name: '소멸의 여로 (에르다 스펙트럼)', category: 'weekly_quest', type: 'boolean', minLevel: 200, region: '소멸의 여로', icon: '🌊', resetType: 'weekly_thu' },
-  { id: 'weekly_arcane_chuchu', name: '츄츄 아일랜드 (배고픈 무토)', category: 'weekly_quest', type: 'boolean', minLevel: 210, region: '츄츄 아일랜드', icon: '🥪', resetType: 'weekly_thu' },
-  { id: 'weekly_arcane_lachelein', name: '레헬른 (미드나잇 체이서)', category: 'weekly_quest', type: 'boolean', minLevel: 220, region: '레헬른', icon: '🎭', resetType: 'weekly_thu' },
-  { id: 'weekly_arcane_arcana', name: '아르카나 (스피릿 세이비어)', category: 'weekly_quest', type: 'boolean', minLevel: 225, region: '아르카나', icon: '🌳', resetType: 'weekly_thu' },
-  { id: 'weekly_arcane_morass', name: '모라스 (엔하임 시드)', category: 'weekly_quest', type: 'boolean', minLevel: 230, region: '모라스', icon: '🧪', resetType: 'weekly_thu' },
-  { id: 'weekly_arcane_espera', name: '에스페라 (프로텍트 에스페라)', category: 'weekly_quest', type: 'boolean', minLevel: 235, region: '에스페라', icon: '✨', resetType: 'weekly_thu' },
+  { id: 'weekly_arcane_vanishing', name: '에르다 스펙트럼', category: 'weekly_quest', type: 'boolean', minLevel: 200, region: '소멸의 여로', icon: '🌊', resetType: 'weekly_thu' },
+  { id: 'weekly_arcane_chuchu', name: '배고픈 무토', category: 'weekly_quest', type: 'boolean', minLevel: 210, region: '츄츄 아일랜드', icon: '🥪', resetType: 'weekly_thu' },
+  { id: 'weekly_arcane_lachelein', name: '미드나잇 체이서', category: 'weekly_quest', type: 'boolean', minLevel: 220, region: '레헬른', icon: '🎭', resetType: 'weekly_thu' },
+  { id: 'weekly_arcane_arcana', name: '스피릿 세이비어', category: 'weekly_quest', type: 'boolean', minLevel: 225, region: '아르카나', icon: '🌳', resetType: 'weekly_thu' },
+  { id: 'weekly_arcane_morass', name: '엔하임 디펜스', category: 'weekly_quest', type: 'boolean', minLevel: 230, region: '모라스', icon: '🧪', resetType: 'weekly_thu' },
+  { id: 'weekly_arcane_espera', name: '프로텍트 에스페라', category: 'weekly_quest', type: 'boolean', minLevel: 235, region: '에스페라', icon: '✨', resetType: 'weekly_thu' },
 ];
 
 export const EPIC_DUNGEONS: TaskItem[] = [
@@ -49,9 +49,9 @@ export const EPIC_DUNGEONS: TaskItem[] = [
 ];
 
 export const WEEKLY_GUILD_AND_MISC: TaskItem[] = [
-  { id: 'weekly_sharenian_culvert', name: '샤레니안의 지하 수로', category: 'weekly_content', type: 'boolean', icon: '🏛️', badge: '노블포인트', resetType: 'weekly_sun' },
-  { id: 'weekly_flag_race', name: '플래그 레이스', category: 'weekly_content', type: 'boolean', icon: '🚩', badge: '노블포인트', resetType: 'weekly_sun' },
-  { id: 'weekly_mulung_dojang', name: '무릉도장', category: 'weekly_content', type: 'boolean', icon: '🥋', badge: '일 23:30 정산', resetType: 'weekly_sun' },
+  { id: 'weekly_sharenian_culvert', name: '샤레니안의 지하 수로', category: 'weekly_content', type: 'boolean', icon: '🏛️', badge: '노블포인트', resetType: 'weekly_thu' },
+  { id: 'weekly_flag_race', name: '플래그 레이스', category: 'weekly_content', type: 'boolean', icon: '🚩', badge: '노블포인트', resetType: 'weekly_thu' },
+  { id: 'weekly_mulung_dojang', name: '무릉도장', category: 'weekly_content', type: 'boolean', icon: '🥋', resetType: 'weekly_thu' },
 ];
 
 // 보스 그룹화 정의 (맞춤 설정 모달에서 보스별 단일 난이도 선택 지원)
@@ -217,16 +217,16 @@ export const BOSS_GROUP_DEFINITIONS: BossGroupDefinition[] = [
     icon: '👹',
     difficulties: [
       { id: 'boss_easy_kaling', difficulty: 'easy', label: '이지', mesoValue: 320000000 },
-      { id: 'boss_normal_kaling', difficulty: 'normal', label: '노말', mesoValue: 576000000 },
+      { id: 'boss_normal_kaling', difficulty: 'normal', label: '노말', mesoValue: 593000000 },
       { id: 'boss_hard_kaling', difficulty: 'hard', label: '하드', mesoValue: 1560000000 },
-      { id: 'boss_extreme_kaling', difficulty: 'extreme', label: '익스트림', mesoValue: 5387000000 },
+      { id: 'boss_extreme_kaling', difficulty: 'extreme', label: '익스트림', mesoValue: 4845000000 },
     ],
   },
   {
     baseName: '찬란한 흉성',
     icon: '☄️',
     difficulties: [
-      { id: 'boss_normal_radiant_star', difficulty: 'normal', label: '노말', mesoValue: 593000000 },
+      { id: 'boss_normal_radiant_star', difficulty: 'normal', label: '노말', mesoValue: 576000000 },
       { id: 'boss_hard_radiant_star', difficulty: 'hard', label: '하드', mesoValue: 2678000000 },
     ],
   },
@@ -245,6 +245,7 @@ export const BOSS_GROUP_DEFINITIONS: BossGroupDefinition[] = [
     difficulties: [
       { id: 'boss_normal_limbo', difficulty: 'normal', label: '노말', mesoValue: 995000000 },
       { id: 'boss_hard_limbo', difficulty: 'hard', label: '하드', mesoValue: 2385000000 },
+      { id: 'boss_extreme_limbo', difficulty: 'extreme', label: '익스트림', mesoValue: 7500000000 },
     ],
   },
   {
@@ -253,6 +254,7 @@ export const BOSS_GROUP_DEFINITIONS: BossGroupDefinition[] = [
     difficulties: [
       { id: 'boss_normal_valdrix', difficulty: 'normal', label: '노말', mesoValue: 1320000000 },
       { id: 'boss_hard_valdrix', difficulty: 'hard', label: '하드', mesoValue: 3078000000 },
+      { id: 'boss_extreme_valdrix', difficulty: 'extreme', label: '익스트림', mesoValue: 9600000000 },
     ],
   },
   {
@@ -260,7 +262,7 @@ export const BOSS_GROUP_DEFINITIONS: BossGroupDefinition[] = [
     icon: '⚡',
     difficulties: [
       { id: 'boss_normal_jupiter', difficulty: 'normal', label: '노말', mesoValue: 1560000000 },
-      { id: 'boss_hard_jupiter', difficulty: 'hard', label: '하드', mesoValue: 4845000000 },
+      { id: 'boss_extreme_jupiter', difficulty: 'extreme', label: '익스트림', mesoValue: 5387000000 },
     ],
   },
 ];
@@ -435,27 +437,46 @@ export const ALL_TASKS_MAP = new Map<string, TaskItem>([
   ...WEEKLY_GUILD_AND_MISC.map((t) => [t.id, t] as [string, TaskItem]),
   ...WEEKLY_BOSSES.map((t) => [t.id, t] as [string, TaskItem]),
   ...BLACK_MAGE_TASKS.map((t) => [t.id, t] as [string, TaskItem]),
+  // 하위 호환성: 이전 버전에서 저장된 boss_hard_jupiter 안전 지원
+  ['boss_hard_jupiter', {
+    id: 'boss_extreme_jupiter',
+    name: '유피테르 (익스트림)',
+    category: 'weekly_boss' as const,
+    type: 'boolean' as const,
+    difficulty: 'extreme' as const,
+    mesoValue: 5387000000,
+    icon: '⚡',
+    resetType: 'weekly_thu' as const,
+  }],
 ]);
 
-// 캐릭터 레벨에 맞는 추천 기본 활성 태스크 ID 목록 (몬스터파크, 에픽던전은 계정 공통 관리로 제외)
+// 캐릭터 추천 기본 활성 태스크 ID 목록 (계정 컨텐츠인 몬스터파크 및 모든 에픽던전 기본 무조건 전체 등록)
 export function getDefaultEnabledTasksForLevel(level: number): string[] {
   const result: string[] = [];
 
-  // 일일 퀘스트
+  // 1. 몬스터파크 (계정 공통 컨텐츠: 레벨 무관 기본 무조건 등록)
+  result.push('daily_monster_park');
+
+  // 2. 에픽 던전 전체 (계정 공통 컨텐츠: 레벨 무관 기본 무조건 등록)
+  EPIC_DUNGEONS.forEach((epic) => {
+    result.push(epic.id);
+  });
+
+  // 3. 일일 퀘스트 (아케인리버 / 그란디스)
   DAILY_QUESTS.forEach((q) => {
     if (!q.minLevel || level >= q.minLevel) {
       result.push(q.id);
     }
   });
 
-  // 주간 퀘스트
+  // 4. 주간 퀘스트
   WEEKLY_QUESTS.forEach((q) => {
     if (!q.minLevel || level >= q.minLevel) {
       result.push(q.id);
     }
   });
 
-  // 무릉 / 수로 / 플래그
+  // 5. 무릉 / 수로 / 플래그
   result.push('weekly_mulung_dojang', 'weekly_sharenian_culvert', 'weekly_flag_race');
 
   return result;

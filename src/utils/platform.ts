@@ -8,10 +8,12 @@ export const isElectron: boolean =
 
 export const isWeb: boolean = !isElectron;
 
+// PiP(미니 모드) 지원 여부: 데스크톱(Electron) 환경 전용
 export const supportsPiP: boolean = isElectron;
 export const supportsWindowControls: boolean = isElectron;
 export const supportsAutoStart: boolean = isElectron;
-export const supportsFileBackup: boolean = isElectron;
+// 백업 및 복원은 순수 브라우저 표준(Blob 파일 다운로드 / FileReader)으로 작동하므로 웹과 데스크톱 모두 100% 지원
+export const supportsFileBackup: boolean = true;
 
 export const LOCAL_STORAGE_DATA_KEY = 'maplestory_scheduler_app_data_v1';
 export const LOCAL_STORAGE_WEB_KEYS_KEY = 'maplestory_web_api_keys_v1';

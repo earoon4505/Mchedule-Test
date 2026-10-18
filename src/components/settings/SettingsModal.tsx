@@ -34,6 +34,7 @@ import {
 import { AppSettings, PipDirection, PipSettings, NotificationSettings } from '../../types';
 import { BlackMageSilhouetteIcon } from '../common/BlackMageIcon';
 import { supportsPiP, supportsAutoStart, supportsFileBackup, isWeb } from '../../utils/platform';
+import { SwitchToggle } from '../common/SwitchToggle';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -61,6 +62,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenLegalModal,
 }) => {
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [isDownloadingApp, setIsDownloadingApp] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -148,7 +150,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const pip: PipSettings = {
     enabled: false,
-    opacity: 90,
+    opacity: 100,
     direction: 'horizontal',
     align: 'right',
     position: 'top',
@@ -195,19 +197,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      onImportData(file);
+      setPendingImportFile(file);
       e.target.value = '';
+    }
+  };
+
+  const handleExecuteImport = () => {
+    if (pendingImportFile) {
+      onImportData(pendingImportFile);
+      setPendingImportFile(null);
+      showNotification('데이터 복원이 성공적으로 시작되었습니다.');
     }
   };
 
   return (
     <div 
       id="settings-modal-backdrop"
-      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
     >
       <div 
         id="settings-modal"
-        className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden text-slate-800 dark:text-slate-100 flex flex-col max-h-[90vh]"
+        className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden text-slate-800 dark:text-slate-100 flex flex-col max-h-[82dvh] sm:max-h-[90vh]"
       >
         {/* 헤더 */}
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900">
@@ -233,8 +243,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         )}
 
-        {/* 본문 */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+        {/* 본문 (스크롤바 숨김: no-scrollbar) */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar touch-pan-y overscroll-contain min-h-0">
           {/* 1. 테마 설정 (다크 모드 / 라이트 모드) */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -252,19 +262,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </span>
               </div>
 
-              <button
+              <SwitchToggle
                 id="btn-settings-darkmode-toggle"
-                onClick={() => onUpdateSettings({ darkMode: !settings.darkMode })}
-                className={`w-12 h-6 rounded-full transition-colors relative ${
-                  settings.darkMode ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-                    settings.darkMode ? 'translate-x-7' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+                checked={!!settings.darkMode}
+                onChange={(checked) => onUpdateSettings({ darkMode: checked })}
+                activeColor="bg-orange-500"
+                ariaLabel={settings.darkMode ? '다크 모드' : '라이트 모드'}
+              />
             </div>
           </div>
 
@@ -282,25 +286,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* PiP 모드 ON/OFF 토글 */}
-              <button
+              <SwitchToggle
                 id="btn-settings-pip-toggle"
-                onClick={() => {
-                  const nextEnabled = !pip.enabled;
-                  if ((window as any).electronAPI?.togglePiPWindow) {
-                    (window as any).electronAPI.togglePiPWindow();
-                  }
-                  updatePipSettings({ enabled: nextEnabled });
+                checked={!!pip.enabled}
+                onChange={(checked) => {
+                  updatePipSettings({ enabled: checked });
                 }}
-                className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
-                  pip.enabled ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-                    pip.enabled ? 'translate-x-7' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+                activeColor="bg-orange-500"
+                ariaLabel="PiP모드 토글"
+              />
             </div>
 
             {/* 프로필 사진만 나오게 축소 (onlyAvatar) */}
@@ -310,18 +304,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>프로필 사진만 표시</span>
               </div>
 
-              <button
-                onClick={() => updatePipSettings({ onlyAvatar: !pip.onlyAvatar })}
-                className={`w-11 h-5.5 rounded-full transition-colors relative cursor-pointer ${
-                  pip.onlyAvatar ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`block w-3.5 h-3.5 rounded-full bg-white transition-transform ${
-                    pip.onlyAvatar ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <SwitchToggle
+                id="switch-pip-only-avatar"
+                checked={!!pip.onlyAvatar}
+                onChange={(checked) => updatePipSettings({ onlyAvatar: checked })}
+                size="sm"
+                activeColor="bg-orange-500"
+                ariaLabel="프로필 사진만 표시"
+              />
             </div>
 
             {/* 모든 스케줄 완료 시 해당 캐릭터 카드 pip 안 보이게 하기 */}
@@ -331,18 +321,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>완료된 캐릭터 숨기기</span>
               </div>
 
-              <button
-                onClick={() => updatePipSettings({ hideCompleted: !pip.hideCompleted })}
-                className={`w-11 h-5.5 rounded-full transition-colors relative cursor-pointer ${
-                  pip.hideCompleted ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`block w-3.5 h-3.5 rounded-full bg-white transition-transform ${
-                    pip.hideCompleted ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <SwitchToggle
+                id="switch-pip-hide-completed"
+                checked={!!pip.hideCompleted}
+                onChange={(checked) => updatePipSettings({ hideCompleted: checked })}
+                size="sm"
+                activeColor="bg-orange-500"
+                ariaLabel="완료된 캐릭터 숨기기"
+              />
             </div>
 
             {/* 즐겨찾기 한 캐릭터 카드만 PiP에 표시 */}
@@ -352,18 +338,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>즐겨찾기만 표시</span>
               </div>
 
-              <button
-                onClick={() => updatePipSettings({ onlyFavorites: !pip.onlyFavorites })}
-                className={`w-11 h-5.5 rounded-full transition-colors relative cursor-pointer ${
-                  pip.onlyFavorites ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`block w-3.5 h-3.5 rounded-full bg-white transition-transform ${
-                    pip.onlyFavorites ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <SwitchToggle
+                id="switch-pip-only-favorites"
+                checked={!!pip.onlyFavorites}
+                onChange={(checked) => updatePipSettings({ onlyFavorites: checked })}
+                size="sm"
+                activeColor="bg-orange-500"
+                ariaLabel="즐겨찾기만 표시"
+              />
             </div>
 
             {/* 계정 컨텐츠 표시 */}
@@ -373,18 +355,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>계정 컨텐츠 표시</span>
               </div>
 
-              <button
-                onClick={() => updatePipSettings({ showCommonContent: !pip.showCommonContent })}
-                className={`w-11 h-5.5 rounded-full transition-colors relative cursor-pointer ${
-                  pip.showCommonContent ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`block w-3.5 h-3.5 rounded-full bg-white transition-transform ${
-                    pip.showCommonContent ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <SwitchToggle
+                id="switch-pip-show-common-content"
+                checked={!!pip.showCommonContent}
+                onChange={(checked) => updatePipSettings({ showCommonContent: checked })}
+                size="sm"
+                activeColor="bg-orange-500"
+                ariaLabel="계정 컨텐츠 표시"
+              />
             </div>
 
             {/* 정렬 방법 : 가로 or 세로 */}
@@ -525,40 +503,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         : 'text-slate-400'
                     }`}
                   />
-                  <span>즐겨찾기 캐릭터만 적용</span>
+                  <span className="whitespace-nowrap">즐겨찾기 캐릭터만 적용</span>
                 </button>
 
                 {/* 알림이 토글 스위치 */}
-                <button
-                  type="button"
+                <SwitchToggle
                   id="btn-settings-notifier-toggle"
-                  onClick={() => updateNotifier({ enabled: !notifier.enabled })}
-                  className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
-                    notifier.enabled ? 'bg-rose-500' : 'bg-slate-200 dark:bg-slate-700'
-                  }`}
-                  title={notifier.enabled ? '알림이 끄기' : '알림이 켜기'}
-                >
-                  <span
-                    className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-                      notifier.enabled ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                  checked={!!notifier.enabled}
+                  onChange={(checked) => updateNotifier({ enabled: checked })}
+                  activeColor="bg-rose-500"
+                  ariaLabel={notifier.enabled ? '알림이 끄기' : '알림이 켜기'}
+                />
               </div>
             </div>
 
-            {/* 시간 및 분 조절 칸 (PIP 크기 조절처럼 칸 각각 생성) */}
+            {/* 시간 및 분 조절 칸 (모바일: 1열 세로 정렬로 폰트 깨짐 방지 / 데스크톱: 기존 2열 가로 정렬 100% 보존) */}
             {notifier.enabled && (
               <div className="pt-3 border-t border-rose-200/60 dark:border-rose-900/40 space-y-3 animate-in fade-in duration-150">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   {/* 시간 조절 칸 (0시 ~ 23시) */}
                   <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-rose-200/60 dark:border-slate-800 flex items-center justify-between shadow-2xs">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-rose-500" />
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">시간</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Clock className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">시간 설정</span>
                     </div>
 
-                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700 flex-shrink-0">
                       <button
                         type="button"
                         id="btn-notifier-hours-minus"
@@ -573,7 +543,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <Minus className="w-3.5 h-3.5" />
                       </button>
 
-                      <span className="w-10 text-center text-xs font-black text-slate-800 dark:text-slate-100 select-none">
+                      <span className="w-12 text-center text-xs font-black text-slate-800 dark:text-slate-100 select-none whitespace-nowrap">
                         {notifier.hours || 0}시간
                       </span>
 
@@ -595,12 +565,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   {/* 분 조절 칸 (0분 ~ 55분, 5분 단위) */}
                   <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-rose-200/60 dark:border-slate-800 flex items-center justify-between shadow-2xs">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-rose-500" />
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">분</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Clock className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">분 설정</span>
                     </div>
 
-                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700 flex-shrink-0">
                       <button
                         type="button"
                         id="btn-notifier-minutes-minus"
@@ -615,7 +585,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <Minus className="w-3.5 h-3.5" />
                       </button>
 
-                      <span className="w-10 text-center text-xs font-black text-slate-800 dark:text-slate-100 select-none">
+                      <span className="w-12 text-center text-xs font-black text-slate-800 dark:text-slate-100 select-none whitespace-nowrap">
                         {notifier.minutes || 0}분
                       </span>
 
@@ -639,7 +609,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {/* 설정 안내 문구 */}
                 <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-rose-200/40 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0 animate-ping" />
-                  <span>
+                  <span className="leading-snug break-keep">
                     컨텐츠 초기화 <strong className="text-rose-600 dark:text-rose-400 font-bold">{notifier.hours}시간 {notifier.minutes}분 전</strong>에 미완료된 컨텐츠, 캐릭터를 알립니다.
                   </span>
                 </div>
@@ -701,24 +671,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span className="text-xs font-bold text-slate-900 dark:text-white">Windows 시작 시 자동 실행</span>
                 </div>
 
-                <button
-                  onClick={() => {
-                    const nextVal = !settings.autoStart;
-                    onUpdateSettings({ autoStart: nextVal });
+                <SwitchToggle
+                  id="switch-settings-auto-start"
+                  checked={!!settings.autoStart}
+                  onChange={(checked) => {
+                    onUpdateSettings({ autoStart: checked });
                     if (typeof window !== 'undefined' && (window as any).electronAPI?.setAutoStart) {
-                      (window as any).electronAPI.setAutoStart(nextVal);
+                      (window as any).electronAPI.setAutoStart(checked);
                     }
                   }}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${
-                    settings.autoStart ? 'bg-sky-500' : 'bg-slate-200 dark:bg-slate-700'
-                  }`}
-                >
-                  <span
-                    className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-                      settings.autoStart ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                  activeColor="bg-sky-500"
+                  ariaLabel="Windows 시작 시 자동 실행"
+                />
               </div>
             )}
 
@@ -729,18 +693,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span className="text-xs font-bold text-slate-900 dark:text-white">체크 사운드 효과음</span>
               </div>
 
-              <button
-                onClick={() => onUpdateSettings({ soundEnabled: !settings.soundEnabled })}
-                className={`w-12 h-6 rounded-full transition-colors relative ${
-                  settings.soundEnabled ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-                    settings.soundEnabled ? 'translate-x-7' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+              <SwitchToggle
+                id="switch-settings-sound"
+                checked={!!settings.soundEnabled}
+                onChange={(checked) => onUpdateSettings({ soundEnabled: checked })}
+                activeColor="bg-emerald-500"
+                ariaLabel="체크 사운드 효과음"
+              />
             </div>
           </div>
 
@@ -760,20 +719,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span className="text-xs font-bold text-slate-900 dark:text-white">검은 마법사 포함</span>
               </div>
 
-              <button
+              <SwitchToggle
                 id="btn-settings-include-black-mage"
-                type="button"
-                onClick={() => onUpdateSettings({ includeBlackMageInCompletion: !settings.includeBlackMageInCompletion })}
-                className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
-                  settings.includeBlackMageInCompletion ? 'bg-red-600' : 'bg-slate-200 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-                    settings.includeBlackMageInCompletion ? 'translate-x-7' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+                checked={!!settings.includeBlackMageInCompletion}
+                onChange={(checked) => onUpdateSettings({ includeBlackMageInCompletion: checked })}
+                activeColor="bg-red-600"
+                ariaLabel="검은 마법사 포함"
+              />
             </div>
 
             {/* 커스텀 스케줄 포함 여부 */}
@@ -783,20 +735,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span className="text-xs font-bold text-slate-900 dark:text-white">커스텀 스케줄 포함</span>
               </div>
 
-              <button
+              <SwitchToggle
                 id="btn-settings-include-custom"
-                type="button"
-                onClick={() => onUpdateSettings({ includeCustomInCompletion: !settings.includeCustomInCompletion })}
-                className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
-                  settings.includeCustomInCompletion ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-slate-200 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`block w-4 h-4 rounded-full ${settings.includeCustomInCompletion ? 'bg-white dark:bg-zinc-900' : 'bg-white'} transition-transform ${
-                    settings.includeCustomInCompletion ? 'translate-x-7' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+                checked={!!settings.includeCustomInCompletion}
+                onChange={(checked) => onUpdateSettings({ includeCustomInCompletion: checked })}
+                activeColor="bg-zinc-900 dark:bg-zinc-100"
+                ariaLabel="커스텀 스케줄 포함"
+              />
             </div>
           </div>
 
@@ -806,18 +751,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               데이터 관리 및 초기화
             </h4>
             
-            {/* 백업 / 복원 버튼 (데스크톱 전용) */}
+            {/* 백업 / 복원 버튼 (웹 및 데스크톱 공통 지원) */}
             {supportsFileBackup && (
               <div className="grid grid-cols-2 gap-2.5">
                 <button
                   onClick={onExportData}
-                  className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                  className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-colors shadow-xs hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5 text-sky-500" />
                   <span>데이터 백업 (JSON)</span>
                 </button>
 
-                <label className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-center shadow-xs">
+                <label className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-center shadow-xs hover:bg-slate-50 dark:hover:bg-slate-850">
                   <Upload className="w-3.5 h-3.5 text-amber-500" />
                   <span>데이터 복원</span>
                   <input
@@ -868,46 +813,81 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* 7. 운영 정책 및 법적 고지 */}
+          {/* 7. 운영 정책 및 법적 고지 (모바일 화면 폭에 맞춰 단정하고 깔끔하게 정렬) */}
           <div className="space-y-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
               운영 정책 및 라이선스
             </h4>
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <Scale className="w-4 h-4 text-orange-500" />
+                  <Scale className="w-4 h-4 text-orange-500 flex-shrink-0" />
                   <span className="text-xs font-bold text-slate-900 dark:text-white">
                     이용약관 및 개인정보처리방침
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onOpenLegalModal?.('terms');
-                    }}
-                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:text-orange-500 transition-colors shadow-2xs"
-                  >
-                    이용약관
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onOpenLegalModal?.('privacy');
-                    }}
-                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:text-orange-500 transition-colors shadow-2xs"
-                  >
-                    개인정보
-                  </button>
+                <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                  {isWeb ? (
+                    <>
+                      <a
+                        href="/terms"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onClose();
+                          if (window.location.pathname !== '/terms') {
+                            window.history.pushState({}, '', '/terms');
+                            window.dispatchEvent(new PopStateEvent('popstate'));
+                          }
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:text-orange-500 active:scale-95 transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                      >
+                        이용약관
+                      </a>
+                      <a
+                        href="/privacy"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onClose();
+                          if (window.location.pathname !== '/privacy') {
+                            window.history.pushState({}, '', '/privacy');
+                            window.dispatchEvent(new PopStateEvent('popstate'));
+                          }
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:text-orange-500 active:scale-95 transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                      >
+                        개인정보
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenLegalModal?.('terms');
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:text-orange-500 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                      >
+                        이용약관
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenLegalModal?.('privacy');
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:text-orange-500 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                      >
+                        개인정보
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-              <p className="text-[10.5px] text-slate-400 leading-relaxed">
-                Data based on NEXON Open API · MapleStory © NEXON Korea Corp.
-                <br />공식 문의: mchedule4505@gmail.com
-              </p>
+              <div className="pt-1.5 border-t border-slate-200/50 dark:border-slate-700/50 text-[10.5px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                <div>Data based on NEXON Open API · MapleStory © NEXON Korea Corp.</div>
+                <div>공식 문의: mchedule4505@gmail.com</div>
+              </div>
             </div>
           </div>
         </div>
@@ -922,6 +902,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* 화면 중앙에 표시되는 데이터 복원 전용 확인 모달 */}
+      {pendingImportFile && (
+        <div 
+          id="restore-confirm-modal-backdrop"
+          className="fixed inset-0 z-60 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+        >
+          <div 
+            id="restore-confirm-modal"
+            className="w-full max-w-md bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/60 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4 animate-in zoom-in-95 duration-150 text-slate-800 dark:text-slate-100"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 shrink-0">
+                <Upload className="w-6 h-6" />
+              </div>
+              <div className="space-y-1.5 flex-1">
+                <h4 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
+                  백업 파일로부터 데이터를 복원하시겠습니까?
+                </h4>
+                <div className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed space-y-1">
+                  <p>
+                    선택한 파일: <strong className="text-slate-800 dark:text-slate-200 font-semibold">{pendingImportFile.name}</strong>
+                  </p>
+                  <p>
+                    백업 파일에 저장된 캐릭터 목록, 숙제 체크 기록, 화면 설정 및 넥슨 API 키 정보로 현재 브라우저 데이터가 교체됩니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setPendingImportFile(null)}
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                id="btn-confirm-restore-data"
+                type="button"
+                onClick={handleExecuteImport}
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-600 text-white transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Upload className="w-4 h-4" />
+                <span>데이터 복원 진행</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 화면 중앙에 표시되는 데이터 초기화 전용 확인 모달 */}
       {isConfirmingReset && (
@@ -951,7 +982,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsConfirmingReset(false)}
-                className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
               >
                 취소
               </button>
@@ -959,7 +990,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 id="btn-confirm-reset-all"
                 type="button"
                 onClick={handleExecuteResetAll}
-                className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition-colors shadow-xs flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>데이터 초기화 실행</span>
