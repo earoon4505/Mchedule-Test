@@ -3,15 +3,15 @@
   "productName": "메케줄",
   "author": "MapleSchedule",
   "description": "메이플스토리 통합 스케줄러 & 보스 체크 데스크톱 앱",
-  "version": "1.0.7",
+  "version": "1.2.2",
   "main": "electron/main.cjs",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "BUILD_TARGET=web vite build && esbuild server.ts --bundle --platform=node --format=cjs --external:vite --sourcemap --outfile=dist/server.cjs",
-    "build:web": "BUILD_TARGET=web vite build",
-    "build:desktop": "BUILD_TARGET=desktop node scripts/prepare-build.cjs && BUILD_TARGET=desktop vite build && esbuild server.ts --bundle --platform=node --format=cjs --external:vite --sourcemap --outfile=dist/server.cjs",
+    "build": "node scripts/build-web.cjs",
+    "build:web": "node scripts/build-web.cjs",
+    "build:desktop": "node scripts/build-desktop.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
@@ -40,7 +40,7 @@
     ],
     "win": {
       "icon": "public/icon.ico",
-      "artifactName": "${productName} Setup ${version}.${ext}",
+      "artifactName": "${name}-setup-${version}.${ext}",
       "target": [
         {
           "target": "nsis",

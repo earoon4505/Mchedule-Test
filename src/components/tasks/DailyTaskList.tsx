@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Check, 
   Calendar, 
   Sparkles,
   Compass,
@@ -21,6 +20,8 @@ interface DailyTaskListProps {
   onOpenContentConfig: () => void;
   soundEnabled: boolean;
   collapsible?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   isAlertActive?: boolean;
 }
 
@@ -31,13 +32,23 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
   onOpenContentConfig,
   soundEnabled,
   collapsible = false,
+  isCollapsed: controlledCollapsed,
+  onToggleCollapse,
   isAlertActive = false,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(collapsible);
+  // 외부 제어 상태가 주어지면 사용자 설정(전체 탭 펼침/접힘)을 그대로 유지하고, 개별 탭(collapsible=false)에서는 항상 펼침
+  const [internalCollapsed, setInternalCollapsed] = useState(collapsible);
+  const isControlled = controlledCollapsed !== undefined && onToggleCollapse !== undefined;
+  const isCollapsed = collapsible ? (isControlled ? controlledCollapsed : internalCollapsed) : false;
 
-  useEffect(() => {
-    setIsCollapsed(collapsible);
-  }, [collapsible]);
+  const handleToggleCollapse = () => {
+    if (!collapsible) return;
+    if (isControlled) {
+      onToggleCollapse();
+    } else {
+      setInternalCollapsed((prev) => !prev);
+    }
+  };
 
   // 활성화된 일일 태스크 목록 필터링 (몬스터파크는 계정 공통 진행 현황으로 분리)
   const enabledIds = character.enabledTaskIds || [];
@@ -72,20 +83,20 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
     <div id="daily-task-list">
       {/* 일일 컨텐츠 상단 요약 바 (박스 전체 클릭 시 펼치기/접기 지원) */}
       <div 
-        onClick={collapsible ? () => setIsCollapsed((prev) => !prev) : undefined}
+        onClick={collapsible ? handleToggleCollapse : undefined}
         className={`relative overflow-hidden flex flex-wrap items-center justify-between gap-3 p-4 border rounded-2xl shadow-xs transition-all ${
           collapsible ? 'cursor-pointer select-none' : ''
         } ${
         isAlertActive && !isAllCompleted
           ? 'border-2 border-red-500 ring-2 ring-red-500/50 animate-pulse bg-red-50/40 dark:bg-red-950/20 shadow-md shadow-red-500/20'
           : isAllCompleted
-          ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 ring-1 ring-amber-400/20'
-          : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800'
+          ? 'bg-amber-100/90 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700 ring-1 ring-amber-400/30'
+          : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347]'
       }`}>
         {/* 숙제 완료 비율에 따른 왼쪽 게이지 채움 (전부 완료 전) */}
         {!isAllCompleted && progressPercent > 0 && (
           <div
-            className="absolute inset-y-0 left-0 bg-amber-100/70 dark:bg-amber-900/30 transition-all duration-300 pointer-events-none"
+            className="absolute inset-y-0 left-0 bg-amber-200/80 dark:bg-amber-900/50 transition-all duration-300 pointer-events-none"
             style={{ width: `${progressPercent}%` }}
           />
         )}
@@ -122,12 +133,12 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setIsCollapsed((prev) => !prev);
+                handleToggleCollapse();
               }}
               className={`p-1.5 rounded-xl border transition-colors shadow-xs ml-0.5 cursor-pointer ${
                 isAllCompleted
                   ? 'border-amber-200 dark:border-amber-800 bg-amber-100/80 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800'
-                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-500 hover:text-amber-600'
+                  : 'border-[#EEDFD0] dark:border-[#303D56] bg-[#FFFDFB] dark:bg-[#20293B] hover:bg-[#FCF6EF] dark:hover:bg-[#2A354C] text-slate-500 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400'
               }`}
               title={isCollapsed ? '목록 펼치기' : '목록 접기'}
             >
@@ -174,7 +185,7 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
               className="pt-3.5 space-y-4"
             >
               {totalCount === 0 ? (
-            <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl text-slate-400">
+            <div className="p-8 text-center bg-[#FFFDFB] dark:bg-[#171E2C] border border-[#EEDFD0] dark:border-[#283347] rounded-2xl text-slate-400">
               <p className="text-xs font-semibold">선택된 일일 컨텐츠가 없습니다.</p>
               <button
                 onClick={onOpenContentConfig}
@@ -194,36 +205,34 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
                       아케인리버 일일 퀘스트
                     </h5>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5">
                     {arcaneTasks.map((task) => {
                       const isDone = !!record?.dailyTasks?.[task.id]?.completed;
                       return (
                         <div
                           key={task.id}
                           onClick={() => handleToggle(task.id, isDone)}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between select-none shadow-xs ${
+                          className={`relative h-[86px] p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between select-none shadow-2xs ${
                             isDone
-                              ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 opacity-80'
-                              : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-800'
+                              ? 'bg-amber-100 dark:bg-amber-950 border-amber-300 dark:border-amber-700 ring-1 ring-amber-400/40 shadow-xs'
+                              : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-amber-300 dark:hover:border-amber-700'
                           }`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                            <MapleIcon taskId={task.id} name={task.name} icon={task.icon} fallback="🌊" className="w-11 h-11 object-contain flex-shrink-0" />
+                            <div className="w-13.5 h-13.5 sm:w-14 sm:h-14 flex-shrink-0 flex items-center justify-center">
+                              <MapleIcon
+                                taskId={task.id}
+                                name={task.name}
+                                icon={task.icon}
+                                fallback="🌊"
+                                className="w-full h-full object-contain drop-shadow-xs transition-all"
+                              />
+                            </div>
                             <div className="min-w-0 flex-1">
-                              <p className={`text-xs font-bold truncate ${isDone ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                              <p className="text-xs sm:text-[13px] font-bold leading-tight truncate text-slate-900 dark:text-white">
                                 {task.name}
                               </p>
                             </div>
-                          </div>
-
-                          <div
-                            className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all flex-shrink-0 ${
-                              isDone
-                                ? 'bg-amber-500 border-amber-500 text-white'
-                                : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800'
-                            }`}
-                          >
-                            {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                           </div>
                         </div>
                       );
@@ -241,36 +250,34 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
                       그란디스 일일 퀘스트
                     </h5>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5">
                     {grandisTasks.map((task) => {
                       const isDone = !!record?.dailyTasks?.[task.id]?.completed;
                       return (
                         <div
                           key={task.id}
                           onClick={() => handleToggle(task.id, isDone)}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between select-none shadow-xs ${
+                          className={`relative h-[86px] p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between select-none shadow-2xs ${
                             isDone
-                              ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 opacity-80'
-                              : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-800'
+                              ? 'bg-amber-100 dark:bg-amber-950 border-amber-300 dark:border-amber-700 ring-1 ring-amber-400/40 shadow-xs'
+                              : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-amber-300 dark:hover:border-amber-700'
                           }`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                            <MapleIcon taskId={task.id} name={task.name} icon={task.icon} fallback="☀️" className="w-11 h-11 object-contain flex-shrink-0" />
+                            <div className="w-13.5 h-13.5 sm:w-14 sm:h-14 flex-shrink-0 flex items-center justify-center">
+                              <MapleIcon
+                                taskId={task.id}
+                                name={task.name}
+                                icon={task.icon}
+                                fallback="☀️"
+                                className="w-full h-full object-contain drop-shadow-xs transition-all"
+                              />
+                            </div>
                             <div className="min-w-0 flex-1">
-                              <p className={`text-xs font-bold truncate ${isDone ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                              <p className="text-xs sm:text-[13px] font-bold leading-tight truncate text-slate-900 dark:text-white">
                                 {task.name}
                               </p>
                             </div>
-                          </div>
-
-                          <div
-                            className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all flex-shrink-0 ${
-                              isDone
-                                ? 'bg-amber-500 border-amber-500 text-white'
-                                : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800'
-                            }`}
-                          >
-                            {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                           </div>
                         </div>
                       );

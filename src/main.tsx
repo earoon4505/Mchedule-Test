@@ -4,9 +4,28 @@ import App from './App.tsx';
 import { StandalonePiPView } from './components/pip/StandalonePiPView.tsx';
 import { GuidePage } from './pages/GuidePage.tsx';
 import { LegalPage } from './pages/LegalPage.tsx';
+import { LOCAL_STORAGE_DATA_KEY } from './utils/platform';
 import './index.css';
 
 const isPiP = window.location.search.includes('pip=') || window.location.hash.includes('pip');
+
+// 독립 웹페이지(/guide, /terms, /privacy) 진입 시 저장된 다크모드 상태를 즉시 DOM에 동기화하여 라이트/다크 테마 일관성 유지
+function syncDocumentDarkModeFromStorage() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_DATA_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const isDark = !!parsed?.settings?.darkMode;
+      document.documentElement.classList.toggle('dark', isDark);
+      return;
+    }
+  } catch (_) {}
+  document.documentElement.classList.remove('dark');
+}
+
+if (!isPiP && window.location.pathname !== '/') {
+  syncDocumentDarkModeFromStorage();
+}
 
 if (isPiP) {
   document.documentElement.style.background = 'transparent';
@@ -45,6 +64,19 @@ function RootApp() {
       window.removeEventListener('popstate', handlePopState);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isPiP && currentPath !== '/') {
+      syncDocumentDarkModeFromStorage();
+      const handleStorage = (e: StorageEvent) => {
+        if (e.key === LOCAL_STORAGE_DATA_KEY) {
+          syncDocumentDarkModeFromStorage();
+        }
+      };
+      window.addEventListener('storage', handleStorage);
+      return () => window.removeEventListener('storage', handleStorage);
+    }
+  }, [currentPath]);
 
   if (isPiP) {
     return <StandalonePiPView />;

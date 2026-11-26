@@ -2,7 +2,6 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { calculateScouterBossData } from './src/utils/scouterEngine.ts';
 
 const currentDirname = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
 
@@ -270,6 +269,54 @@ async function mapConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => P
 
   await Promise.all(workers);
   return results.filter((r): r is R => r !== null);
+}
+
+// 넥슨 Open API 점검 vs 메이플 게임 서버 점검 정밀 판별 헬퍼
+function parseNexonMaintenance(status: number, errJson: any) {
+  const errName = (errJson?.error?.name || errJson?.name || errJson?.code || '').toString().toUpperCase();
+  const errMsg = (errJson?.error?.message || errJson?.error || errJson?.message || (typeof errJson === 'string' ? errJson : '')).toString();
+
+  // 1. [게임 서버 점검] - 넥슨 공식: OPENAPI00010 (Game service under maintenance)
+  const isGameMaint = errName === 'OPENAPI00010' ||
+    errMsg.includes('OPENAPI00010') ||
+    errMsg.includes('게임 서버 점검') ||
+    errMsg.includes('게임 점검') ||
+    errMsg.includes('Game under maintenance');
+
+  if (isGameMaint) {
+    return {
+      isMaintenance: true,
+      maintenanceType: 'game_maintenance' as const,
+      errorCode: errName || 'OPENAPI00010',
+      statusCode: status,
+      error: '메이플스토리 or 넥슨 OPEN API 점검 중',
+    };
+  }
+
+  // 2. [넥슨 Open API 점검] - OPENAPI00011, HTTP 503, 502, 504, 500, OPENAPI00001
+  const isApiMaint = status === 503 ||
+    status === 502 ||
+    status === 504 ||
+    status === 500 ||
+    errName === 'OPENAPI00011' ||
+    errName === 'OPENAPI00001' ||
+    errMsg.includes('OPENAPI00011') ||
+    errMsg.includes('OPENAPI00001') ||
+    errMsg.includes('점검') ||
+    (errMsg.includes('통신') && errMsg.includes('지연'));
+
+  if (isApiMaint) {
+    const codeStr = errName || (status ? `HTTP ${status}` : 'OPENAPI00011');
+    return {
+      isMaintenance: true,
+      maintenanceType: 'api_maintenance' as const,
+      errorCode: codeStr,
+      statusCode: status,
+      error: '메이플스토리 or 넥슨 OPEN API 점검 중',
+    };
+  }
+
+  return null;
 }
 
 // ----------------------------------------------------
@@ -622,8 +669,11 @@ app.post('/api/nexon/key/test', async (req, res) => {
   }
 
   try {
+    const { characterName } = req.body || {};
+    const testChar = (characterName && typeof characterName === 'string' && characterName.trim()) ? characterName.trim() : '메이플용사';
+
     // 넥슨 API 테스트 호출 (예: 메이플 기본 식별자 조회)
-    const testUrl = `https://open.api.nexon.com/maplestory/v1/id?character_name=${encodeURIComponent('메이플용사')}`;
+    const testUrl = `https://open.api.nexon.com/maplestory/v1/id?character_name=${encodeURIComponent(testChar)}`;
     const testRes = await safeFetch(testUrl, {
       headers: {
         'x-nxopen-api-key': targetKey,
@@ -645,12 +695,16 @@ app.post('/api/nexon/key/test', async (req, res) => {
         });
       }
 
-      // 503 또는 500 점검/오류 상태 코드 전파
-      if (testRes.status === 503 || testRes.status === 500) {
-        return res.status(testRes.status).json({
+      // 점검/장애 상태 코드 및 에러 감지 (parseNexonMaintenance 정밀 분기)
+      const maint = parseNexonMaintenance(testRes.status, testJson);
+      if (maint) {
+        return res.status(testRes.status >= 400 ? testRes.status : 503).json({
           success: false,
-          statusCode: testRes.status,
-          error: errMsg || (testRes.status === 503 ? '현재 넥슨 Open API 점검 중입니다.' : '메이플스토리 게임 서버 점검 또는 넥슨 내부 통신 지연 중입니다.'),
+          isMaintenance: true,
+          maintenanceType: maint.maintenanceType,
+          errorCode: maint.errorCode,
+          statusCode: maint.statusCode,
+          error: maint.error,
         });
       }
 
@@ -820,7 +874,21 @@ app.get('/api/nexon/character/basic', async (req, res) => {
         break;
       } else {
         const errJson = await basicRes.json().catch(() => ({}));
-        lastError = errJson.error?.message || `상태 코드 ${basicRes.status}`;
+        const errName = errJson?.error?.name || '';
+        const errMsg = errJson?.error?.message || '';
+        lastError = errMsg || `상태 코드 ${basicRes.status}`;
+
+        const maint = parseNexonMaintenance(basicRes.status, errJson);
+        if (maint) {
+          return res.status(basicRes.status >= 400 ? basicRes.status : 503).json({
+            success: false,
+            isMaintenance: true,
+            maintenanceType: maint.maintenanceType,
+            errorCode: maint.errorCode,
+            statusCode: maint.statusCode,
+            error: maint.error,
+          });
+        }
       }
     }
 
@@ -960,74 +1028,6 @@ app.get('/api/nexon/character/stat', async (req, res) => {
     authenticForce,
     stat: statData,
   });
-});
-
-// 환산 스펙 (환산 주스탯, 헥사 환산, 보스 배율) 웹 프록시 엔드포인트
-app.get('/api/scouter/stats', async (req, res) => {
-  const name = req.query.name as string;
-  if (!name || !name.trim()) {
-    return res.status(400).json({ success: false, error: '캐릭터명이 필요합니다.' });
-  }
-
-  const targetName = name.trim();
-  const cacheKey = `scouter_${targetName.toLowerCase()}`;
-  const cached = getFromCache(cacheKey);
-  if (cached) {
-    return res.json({ success: true, stats: cached, cached: true });
-  }
-
-  try {
-    const scouterApiUrl = `https://api.maplescouter.com/api/id?name=${encodeURIComponent(targetName)}`;
-    const scouterRes = await safeFetch(scouterApiUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
-        'api-key': '01ce8bc7-43a0-4122-ae05-e23f07640b9c',
-        'Referer': 'https://maplescouter.com/',
-        'Origin': 'https://maplescouter.com',
-        'Content-Type': 'application/json',
-      },
-    }, 9000);
-
-    const json = await scouterRes.json().catch(() => null);
-
-    if (json && json.calculatedData) {
-      const calc = json.calculatedData;
-      const mainStatNum = calc.boss300_stat || calc.boss380_stat || 0;
-      const hexaStatNum = calc.boss300_hexaStat || calc.boss380_hexaStat || 0;
-
-      // 메이플스카우터 공식 큐빅 스플라인 및 레벨/포스 반감 엔진으로 보스 배율 및 순서 정밀 계산
-      const { multipliers: bossMultipliers, bossList } = calculateScouterBossData(json);
-
-      const stats = {
-        mainStat: mainStatNum ? mainStatNum.toLocaleString('ko-KR') : '-',
-        hexaStat: hexaStatNum ? hexaStatNum.toLocaleString('ko-KR') : '-',
-        bossMultiplier: '-',
-        combatPower: calc.combatPower ? String(calc.combatPower) : undefined,
-        characterClass: calc.class || undefined,
-        arcaneForce: Number(json.userStat?.stat?.arcaneForce || 0),
-        authenticForce: Number(json.userStat?.stat?.authenticForce || 0),
-        userSymbol: json.userApiData?.symbol || json.userSymbol || undefined,
-        bossMultipliers,
-        bossList,
-        updatedAt: new Date().toISOString(),
-      };
-
-      setCache(cacheKey, stats, 5 * 60 * 1000); // 5분 캐시
-      return res.json({ success: true, stats });
-    }
-
-    if (json && json.message) {
-      return res.status(400).json({ success: false, error: json.message });
-    }
-
-    return res.status(400).json({
-      success: false,
-      error: '메이플스카우터에서 해당 캐릭터의 환산 데이터를 찾지 못했습니다.',
-    });
-  } catch (err: any) {
-    console.error('Scouter fetch error in server.ts:', err);
-    return res.status(500).json({ success: false, error: err.message || '환산 정보 조회 중 오류' });
-  }
 });
 
 // API 계정 내 전체 캐릭터 목록 조회 (/maplestory/v1/character/list)
@@ -1309,6 +1309,18 @@ app.get('/api/nexon/character/scheduler', async (req, res) => {
       schedData = await schedRes.json().catch(() => null);
     } else if (schedRes && schedStatus >= 400) {
       console.warn(`[Nexon Scheduler Warning] status ${schedStatus}`);
+      const errJson = await schedRes.json().catch(() => ({}));
+      const maint = parseNexonMaintenance(schedStatus, errJson);
+      if (maint) {
+        return res.status(schedStatus >= 400 ? schedStatus : 503).json({
+          success: false,
+          isMaintenance: true,
+          maintenanceType: maint.maintenanceType,
+          errorCode: maint.errorCode,
+          statusCode: maint.statusCode,
+          error: maint.error,
+        });
+      }
     }
 
     // 월드리프 등으로 기존 OCID가 만료되어 스케줄러 조회가 실패한 경우:

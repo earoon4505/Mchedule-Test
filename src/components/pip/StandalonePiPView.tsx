@@ -743,7 +743,7 @@ export const StandalonePiPView: React.FC = () => {
                     ? item.type === 'daily'
                       ? 'bg-amber-50 dark:bg-amber-950 border-amber-400 dark:border-amber-500 shadow-amber-500/20 ring-1 ring-amber-400/40'
                       : 'bg-rose-50 dark:bg-rose-950 border-rose-400 dark:border-rose-500 shadow-rose-500/20 ring-1 ring-rose-400/40'
-                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-orange-300'
+                    : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-orange-300 dark:hover:border-orange-500/70'
                 }`}
               >
                 <div className="relative flex items-center justify-center pointer-events-none select-none">
@@ -803,7 +803,7 @@ export const StandalonePiPView: React.FC = () => {
               ? item.type === 'daily'
                 ? 'bg-amber-50 dark:bg-amber-950 border-amber-400 dark:border-amber-500 shadow-amber-500/20 ring-1 ring-amber-400/40'
                 : 'bg-rose-50 dark:bg-rose-950 border-rose-400 dark:border-rose-500 shadow-rose-500/20 ring-1 ring-rose-400/40'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-orange-300'
+              : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-orange-300 dark:hover:border-orange-500/70'
           }`}
         >
           <div className="relative flex items-center justify-center pointer-events-none select-none">
@@ -940,7 +940,7 @@ export const StandalonePiPView: React.FC = () => {
                       ? item.type === 'daily'
                         ? 'bg-amber-100 dark:bg-amber-950 border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/40'
                         : 'bg-rose-100 dark:bg-rose-950 border-rose-400 dark:border-rose-500 ring-2 ring-rose-400/40'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-orange-300'
+                      : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-orange-300 dark:hover:border-orange-500/70'
                   }`}
                 >
                   <div className={`relative w-11 h-11 rounded-xl flex items-center justify-center p-1 transition-all pointer-events-none select-none ${
@@ -948,7 +948,7 @@ export const StandalonePiPView: React.FC = () => {
                       ? item.type === 'daily'
                         ? 'bg-amber-200/60 dark:bg-amber-900/60'
                         : 'bg-rose-200/60 dark:bg-rose-900/60'
-                      : 'bg-slate-100 dark:bg-slate-800/80'
+                      : 'bg-[#F8EDE1] dark:bg-[#20293B]'
                   }`}>
                     <MapleIcon
                       taskId={item.id}
@@ -1027,8 +1027,8 @@ export const StandalonePiPView: React.FC = () => {
                           ? 'bg-emerald-100 dark:bg-emerald-950 border-emerald-500 ring-2 ring-emerald-400'
                           : 'bg-emerald-50 dark:bg-emerald-950 border-emerald-400 hover:border-emerald-500'
                         : isActive
-                        ? 'bg-orange-50 dark:bg-slate-900 border-orange-400 ring-2 ring-orange-400/60'
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-orange-300'
+                        ? 'bg-orange-50 dark:bg-[#171E2C] border-orange-400 ring-2 ring-orange-400/60'
+                        : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-orange-300 dark:hover:border-orange-500/70'
                     }`}
                   >
                     <CharacterAvatar
@@ -1074,8 +1074,8 @@ export const StandalonePiPView: React.FC = () => {
                         ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 dark:border-emerald-500 shadow-sm ring-1 ring-emerald-500/40'
                         : 'bg-emerald-50 dark:bg-emerald-950 border-emerald-300 dark:border-emerald-800 hover:border-emerald-400 dark:hover:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 shadow-xs'
                       : isActive
-                      ? 'bg-white dark:bg-slate-900 border-orange-400 dark:border-orange-500 shadow-sm ring-2 ring-orange-500/20 dark:ring-orange-500/30'
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-xs hover:shadow-sm'
+                      ? 'bg-[#FFFDFB] dark:bg-[#171E2C] border-orange-400 dark:border-orange-500 shadow-sm ring-2 ring-orange-500/20 dark:ring-orange-500/30'
+                      : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-[#DEC8B3] dark:hover:border-[#3A4966] hover:bg-[#FDF8F2] dark:hover:bg-[#1D2536] shadow-xs hover:shadow-sm'
                   }`}
                 >
                   {/* 1. 상단 캐릭터 기본 헤더 (프로필 사진과 닉네임/정보를 세로 중앙 정렬) */}
@@ -1105,7 +1105,7 @@ export const StandalonePiPView: React.FC = () => {
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                           isAllCompleted
                             ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                            : 'bg-[#F8EDE1] dark:bg-[#20293B] text-slate-600 dark:text-slate-300'
                         }`}>
                           Lv.{char.characterLevel}
                         </span>
@@ -1175,7 +1175,7 @@ export const StandalonePiPView: React.FC = () => {
                     ) : (
                       <div
                         title="검은 마법사 미등록"
-                        className="flex items-center justify-center gap-1 font-medium py-1 px-1 rounded border border-transparent text-slate-400 dark:text-slate-600 bg-slate-100/50 dark:bg-slate-900/40 select-none"
+                        className="flex items-center justify-center gap-1 font-medium py-1 px-1 rounded border border-transparent text-slate-400 dark:text-slate-400/80 bg-[#F8EDE1]/50 dark:bg-[#20293B]/65 select-none"
                       >
                         <span className="truncate">검마 -</span>
                       </div>
@@ -1229,7 +1229,7 @@ export const StandalonePiPView: React.FC = () => {
                     ) : (
                       <div
                         title="커스텀 컨텐츠 미등록"
-                        className="flex items-center justify-center gap-1 font-medium py-1 px-1 rounded border border-transparent text-slate-400 dark:text-slate-600 bg-slate-100/50 dark:bg-slate-900/40 select-none"
+                        className="flex items-center justify-center gap-1 font-medium py-1 px-1 rounded border border-transparent text-slate-400 dark:text-slate-400/80 bg-[#F8EDE1]/50 dark:bg-[#20293B]/65 select-none"
                       >
                         <span className="truncate">커스텀 -</span>
                       </div>

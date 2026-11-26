@@ -26,6 +26,7 @@ import {
   fetchNexonSchedulerState, 
   searchNexonCharacter,
   fetchCharacterBasic,
+  fetchCharacterCombatPower,
   fetchApiKeys,
   restoreApiKeys,
   checkNexonServerStatus,
@@ -64,7 +65,6 @@ import { BlackMageCard } from './components/tasks/BlackMageCard';
 import { CustomTaskList } from './components/tasks/CustomTaskList';
 import { ContentConfigModal } from './components/tasks/ContentConfigModal';
 import { ProgressPanel } from './components/stats/ProgressPanel';
-import { ConversionPageView } from './components/conversion/ConversionPageView';
 import { SettingsModal } from './components/settings/SettingsModal';
 // import { AdSenseBanner } from './components/ads/AdSenseBanner'; // 추후 광고 배너 활성화 시 주석 해제
 import { ApiKeyModal } from './components/settings/ApiKeyModal';
@@ -74,6 +74,7 @@ import { LegalModal, LegalTab } from './components/legal/LegalModal';
 import { GuideModal } from './components/guide/GuideModal';
 import { PiPOverlay } from './components/pip/PiPOverlay';
 import { IncompleteScheduleAlertModal } from './components/common/IncompleteScheduleAlertModal';
+import { UpdateModal } from './components/common/UpdateModal';
 import { 
   CharacterAlertStatus, 
   AccountAlertStatus,
@@ -82,7 +83,7 @@ import {
   evaluateAccountAlerts,
   getActiveAlertCycleKey 
 } from './utils/alertNotifier';
-import { Plus, SlidersHorizontal, Calendar, Flame, Crown, LayoutGrid, ShieldAlert, AlertTriangle, X, RefreshCw, ChevronLeft, Users, Package, BarChart3, Calculator } from 'lucide-react';
+import { Plus, SlidersHorizontal, Calendar, Flame, Crown, LayoutGrid, ShieldAlert, AlertTriangle, X, RefreshCw, ChevronLeft, Users, Package, BarChart3 } from 'lucide-react';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { motion, LayoutGroup } from 'motion/react';
 import { isWeb, isElectron, supportsPiP, LOCAL_STORAGE_DATA_KEY } from './utils/platform';
@@ -149,12 +150,52 @@ export default function App() {
   const [lastUpdatedStr, setLastUpdatedStr] = useState<string>('');
   const [autoSyncCountdown, setAutoSyncCountdown] = useState<number>(300);
 
-  // 중앙 뷰 모드: 'schedule' (스케줄 페이지) | 'conversion' (환산 페이지)
-  const [mainViewMode, setMainViewMode] = useState<'schedule' | 'conversion'>('schedule');
   // 중앙 탭: 'all' | 'daily' | 'daily_boss' | 'weekly' | 'bosses' | 'custom'
   const [activeTab, setActiveTab] = useState<'all' | 'daily' | 'daily_boss' | 'weekly' | 'bosses' | 'custom'>('all');
-  const [collapseTrigger, setCollapseTrigger] = useState<number>(0);
   const [characterSelectTrigger, setCharacterSelectTrigger] = useState<number>(0);
+
+  // '전체' 탭 각 섹션의 사용자 펼침/접힘 상태 유지 (캐릭터 전환·탭 이동·재실행 시에도 유지)
+  type SectionCollapseKey = 'daily' | 'daily_boss' | 'weekly' | 'bosses' | 'black_mage' | 'custom';
+  const SECTION_COLLAPSE_STORAGE_KEY = 'mapleschedule_section_collapsed_v1';
+  const DEFAULT_SECTION_COLLAPSED: Record<SectionCollapseKey, boolean> = {
+    daily: true,
+    daily_boss: true,
+    weekly: true,
+    bosses: true,
+    black_mage: true,
+    custom: true,
+  };
+
+  const [sectionCollapsedMap, setSectionCollapsedMap] = useState<Record<SectionCollapseKey, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem(SECTION_COLLAPSE_STORAGE_KEY);
+      if (!raw) return DEFAULT_SECTION_COLLAPSED;
+      const parsed = JSON.parse(raw);
+      return {
+        daily: typeof parsed?.daily === 'boolean' ? parsed.daily : true,
+        daily_boss: typeof parsed?.daily_boss === 'boolean' ? parsed.daily_boss : true,
+        weekly: typeof parsed?.weekly === 'boolean' ? parsed.weekly : true,
+        bosses: typeof parsed?.bosses === 'boolean' ? parsed.bosses : true,
+        black_mage: typeof parsed?.black_mage === 'boolean' ? parsed.black_mage : true,
+        custom: typeof parsed?.custom === 'boolean' ? parsed.custom : true,
+      };
+    } catch {
+      return DEFAULT_SECTION_COLLAPSED;
+    }
+  });
+
+  const handleToggleSectionCollapse = useCallback((sectionKey: SectionCollapseKey) => {
+    setSectionCollapsedMap((prev) => {
+      const next = {
+        ...prev,
+        [sectionKey]: !prev[sectionKey],
+      };
+      try {
+        localStorage.setItem(SECTION_COLLAPSE_STORAGE_KEY, JSON.stringify(next));
+      } catch (_) {}
+      return next;
+    });
+  }, []);
 
   // 모바일 전용 하단 탭 및 캐릭터 화면 서브 뷰 상태 (모바일 최초 접속 시 캐릭터 목록 화면 우선 노출)
   const [mobileTab, setMobileTab] = useState<MobileTabType>('character');
@@ -162,7 +203,6 @@ export default function App() {
 
   const handleSelectCharacter = (id: string) => {
     setActiveCharacterId(id);
-    setCollapseTrigger((prev) => prev + 1);
     setCharacterSelectTrigger((prev) => prev + 1);
     setMobileCharacterSubView('detail'); // 모바일에서 캐릭터 카드 탭 시 바로 해당 캐릭터 할 일로 전환!
     // 메인 창 캐릭터 선택 즉시 로컬 스토리지 저장 및 PiP로 0ms 브로드캐스트
@@ -184,12 +224,40 @@ export default function App() {
   const [configCharacterId, setConfigCharacterId] = useState<string | null>(null);
   const [toastFeedback, setToastFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // 데스크톱 앱 자동 업데이트 상태
+  const [updateInfo, setUpdateInfo] = useState<{ hasUpdate: boolean; version: string; isOpen: boolean }>({
+    hasUpdate: false,
+    version: '',
+    isOpen: false,
+  });
+
+  useEffect(() => {
+    const electron = (window as any).electronAPI;
+    if (!electron?.onUpdateDownloaded) return;
+
+    const unsubscribe = electron.onUpdateDownloaded((info: { version?: string }) => {
+      const ver = info?.version || '1.2.2';
+      setUpdateInfo({
+        hasUpdate: true,
+        version: ver,
+        isOpen: true,
+      });
+    });
+
+    electron.checkForUpdateStatus?.();
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
+
   // 넥슨 Open API & 메이플 게임 서버 점검 상태 관리
   const [maintenanceInfo, setMaintenanceInfo] = useState<{
     isMaintenance: boolean;
     type: NexonMaintenanceType;
     badge: string;
     message: string;
+    errorCode?: string;
   }>({
     isMaintenance: false,
     type: 'none',
@@ -199,25 +267,18 @@ export default function App() {
   const [isMaintenanceBannerVisible, setIsMaintenanceBannerVisible] = useState<boolean>(false);
   const [isCheckingMaintenance, setIsCheckingMaintenance] = useState<boolean>(false);
 
-  // 전역 점검 이벤트 구독 (API 호출 중 503 또는 500 감지 시 자동 반응)
+  // 전역 점검 이벤트 구독 (API 호출 중 503, 500, OPENAPI00011, OPENAPI00010 등 감지 시 자동 반응)
   useEffect(() => {
     const handleMaintenanceEvent = (e: any) => {
       const detail = e.detail;
       if (!detail) return;
-      if (detail.type === 'api_maintenance') {
+      if (detail.isMaintenance || detail.type === 'game_maintenance' || detail.type === 'api_maintenance') {
         setMaintenanceInfo({
           isMaintenance: true,
-          type: 'api_maintenance',
-          badge: 'API 점검 안내',
-          message: detail.message || '현재 넥슨 Open API 서버가 점검 중입니다.',
-        });
-        setIsMaintenanceBannerVisible(true);
-      } else if (detail.type === 'game_maintenance') {
-        setMaintenanceInfo({
-          isMaintenance: true,
-          type: 'game_maintenance',
-          badge: '게임 서버 점검/오류',
-          message: detail.message || '메이플스토리 게임 서버 점검 또는 넥슨 내부 통신 지연 중입니다.',
+          type: detail.type || 'api_maintenance',
+          badge: '점검 중',
+          message: '메이플스토리 or 넥슨 OPEN API 점검 중',
+          errorCode: detail.errorCode,
         });
         setIsMaintenanceBannerVisible(true);
       } else if (detail.type === 'none') {
@@ -226,6 +287,7 @@ export default function App() {
           type: 'none',
           badge: '',
           message: '',
+          errorCode: undefined,
         });
         setIsMaintenanceBannerVisible(false);
       }
@@ -243,25 +305,15 @@ export default function App() {
     try {
       const res = await checkNexonServerStatus();
       if (res.isMaintenance) {
-        if (res.type === 'api_maintenance') {
-          setMaintenanceInfo({
-            isMaintenance: true,
-            type: 'api_maintenance',
-            badge: 'API 점검 안내',
-            message: res.message || '현재 넥슨 Open API 서버가 점검 중입니다.',
-          });
-          setIsMaintenanceBannerVisible(true);
-          showToast('현재 넥슨 Open API 점검 중입니다.', 'error');
-        } else if (res.type === 'game_maintenance') {
-          setMaintenanceInfo({
-            isMaintenance: true,
-            type: 'game_maintenance',
-            badge: '게임 서버 점검/오류',
-            message: res.message || '메이플스토리 게임 서버 점검 또는 넥슨 내부 통신 지연 중입니다.',
-          });
-          setIsMaintenanceBannerVisible(true);
-          showToast('메이플스토리 게임 서버 점검 또는 통신 지연 중입니다.', 'error');
-        }
+        setMaintenanceInfo({
+          isMaintenance: true,
+          type: res.type,
+          badge: '점검 중',
+          message: '메이플스토리 or 넥슨 OPEN API 점검 중',
+          errorCode: res.errorCode,
+        });
+        setIsMaintenanceBannerVisible(true);
+        showToast(`메이플스토리 or 넥슨 OPEN API 점검 중${res.errorCode ? ` (${res.errorCode})` : ''}`, 'error');
       } else {
         if (showSuccessToast) {
           showToast('넥슨 API 및 게임 서버가 정상 연결 상태입니다.', 'success');
@@ -271,6 +323,7 @@ export default function App() {
           type: 'none',
           badge: '',
           message: '',
+          errorCode: undefined,
         });
         setIsMaintenanceBannerVisible(false);
       }
@@ -352,6 +405,7 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [settings.darkMode]);
+
 
   // 페이지 새로고침(F5) 또는 탭 닫기 시 디바운스 대기 중인 최신 데이터 즉시 서버 동기화 (데스크톱 전용)
   useEffect(() => {
@@ -435,6 +489,42 @@ export default function App() {
     []
   );
 
+  // 활성 캐릭터의 아케인포스 / 어센틱포스 / 전투력 자동 로드 (보스 카드 공식 스펙 배율 정밀 연동)
+  useEffect(() => {
+    if (!activeCharacterId) return;
+    const char = characters.find((c) => c.id === activeCharacterId);
+    if (!char || !char.ocid || char.ocid.startsWith('manual_')) return;
+
+    // 포스 정보가 아직 로드되지 않은 경우 백그라운드에서 1회 조회
+    if (char.arcaneForce == null || char.authenticForce == null || !char.combatPower) {
+      let isMounted = true;
+      fetchCharacterCombatPower(char.ocid, char.apiKeyId)
+        .then((res) => {
+          if (!isMounted || !res.success) return;
+          setCharacters((prev) => {
+            const next = prev.map((c) =>
+              c.id === char.id
+                ? {
+                    ...c,
+                    combatPower: res.combatPower || c.combatPower,
+                    arcaneForce: typeof res.arcaneForce === 'number' ? res.arcaneForce : c.arcaneForce,
+                    authenticForce: typeof res.authenticForce === 'number' ? res.authenticForce : c.authenticForce,
+                  }
+                : c
+            );
+            charactersRef.current = next;
+            persistData(next, recordsRef.current, settingsRef.current, activeCharacterIdRef.current, false);
+            return next;
+          });
+        })
+        .catch(() => {});
+
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [activeCharacterId, characters, persistData]);
+
   // PiP 창 및 다중 창 간 실시간 수신 리스너
   useEffect(() => {
     const unsubscribe = subscribeToBroadcast((payload) => {
@@ -472,7 +562,6 @@ export default function App() {
       unsubscribeActiveChar = (window as any).electronAPI.onActiveCharacterChanged((charId: string) => {
         if (charId && charId !== activeCharacterIdRef.current) {
           setActiveCharacterId(charId);
-          setCollapseTrigger((prev) => prev + 1);
           setCharacterSelectTrigger((prev) => prev + 1);
         }
       });
@@ -1089,6 +1178,22 @@ export default function App() {
     setIsRefreshing(true);
 
     try {
+      // 0. 넥슨 API 및 게임 서버 점검 상태 선제 확인
+      const statusCheck = await checkNexonServerStatus();
+      if (statusCheck.isMaintenance) {
+        const msg = '메이플스토리 or 넥슨 OPEN API 점검 중';
+        setMaintenanceInfo({
+          isMaintenance: true,
+          type: statusCheck.type,
+          badge: '점검 중',
+          message: msg,
+          errorCode: statusCheck.errorCode,
+        });
+        setIsMaintenanceBannerVisible(true);
+        showToast(msg, 'error');
+        return;
+      }
+
       // 1. 날짜 리셋 체크 (항상 최신 recordsRef.current를 기반으로 리셋 검사)
       let currentRecords = { ...recordsRef.current };
       currentRecords = checkAndResetRecords(currentRecords);
@@ -1103,6 +1208,20 @@ export default function App() {
           try {
             // 캐릭터 기본 정보 최신화 (레벨업, 코디/프로필 사진 변경 실시간 반영, 월드리프 시 OCID/월드 자동 치유)
             const bRes = await fetchCharacterBasic({ ocid: char.ocid, name: char.characterName }, true, char.apiKeyId);
+            if (bRes.isMaintenance) {
+              const msg = '메이플스토리 or 넥슨 OPEN API 점검 중';
+              setMaintenanceInfo({
+                isMaintenance: true,
+                type: bRes.maintenanceType || 'api_maintenance',
+                badge: '점검 중',
+                message: msg,
+                errorCode: bRes.errorCode,
+              });
+              setIsMaintenanceBannerVisible(true);
+              showToast(msg, 'error');
+              return;
+            }
+
             let activeOcid = char.ocid;
 
             if (bRes.success && bRes.basic) {
@@ -1137,8 +1256,9 @@ export default function App() {
                 hasCharUpdate = true;
               }
             } else if (!bRes.success) {
-              // 닉네임 변경이나 서버 이전 등으로 OCID 재발급까지 실패한 경우
-              if (!char.syncError) {
+              // 점검 오류가 아니고 닉네임 변경이나 서버 이전 등으로 OCID 재발급까지 실패한 경우
+              const isMaintMsg = bRes.error && (bRes.error.includes('점검') || bRes.error.includes('지연'));
+              if (!char.syncError && !isMaintMsg) {
                 updatedChars[i] = {
                   ...char,
                   syncError: true,
@@ -1149,6 +1269,19 @@ export default function App() {
             }
 
             const schedRes = await fetchNexonSchedulerState(activeOcid, true, undefined, char.characterName, char.apiKeyId);
+            if (schedRes.isMaintenance) {
+              const isGame = schedRes.maintenanceType === 'game_maintenance';
+              const msg = isGame ? '메이플스토리 점검 중입니다.' : '넥슨 OPEN API 점검 중입니다.';
+              setMaintenanceInfo({
+                isMaintenance: true,
+                type: schedRes.maintenanceType || 'api_maintenance',
+                badge: isGame ? '게임 서버 점검' : 'API 점검 안내',
+                message: msg,
+              });
+              setIsMaintenanceBannerVisible(true);
+              showToast(msg, 'error');
+              return;
+            }
             if (schedRes.newOcid && schedRes.newOcid !== updatedChars[i].ocid) {
               updatedChars[i] = {
                 ...updatedChars[i],
@@ -1969,11 +2102,13 @@ export default function App() {
     setActiveCharacterId(null);
     setSettings(DEFAULT_SETTINGS);
     setHasApiKey(false);
+    setSectionCollapsedMap(DEFAULT_SECTION_COLLAPSED);
 
     try {
       localStorage.removeItem(LOCAL_STORAGE_KEY);
       localStorage.removeItem('mapleschedule_common_content_ids');
       localStorage.removeItem('mapleschedule_progress_only_favorites');
+      localStorage.removeItem(SECTION_COLLAPSE_STORAGE_KEY);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('storage'));
       }
@@ -2023,14 +2158,14 @@ export default function App() {
 
   if (isInitializing) {
     return (
-      <div className="h-screen w-screen bg-[#F8F9FB] dark:bg-slate-950 flex flex-col items-center justify-center text-slate-800 dark:text-slate-100">
+      <div className="h-screen w-screen bg-[#FBF3EB] dark:bg-[#0B0E14] flex flex-col items-center justify-center text-slate-800 dark:text-slate-100">
         <LoadingSpinner size="xl" text="메이플스토리 스케줄러 시스템을 준비하는 중..." />
       </div>
     );
   }
 
   return (
-    <div className={`h-[100dvh] lg:h-screen w-screen flex flex-col overflow-hidden ${settings.darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-[#F8F9FB] text-slate-800'}`}>
+    <div className={`h-[100dvh] lg:h-screen w-screen flex flex-col overflow-hidden ${settings.darkMode ? 'dark bg-[#0B0E14] text-slate-100' : 'bg-[#FBF3EB] text-slate-800'}`}>
       {/* 1. 상단 Windows 헤더 */}
       <WindowHeader
         characters={characters}
@@ -2047,63 +2182,36 @@ export default function App() {
         currentTimeStr={lastUpdatedStr}
         autoSyncCountdown={autoSyncCountdown}
         autoSyncIntervalSec={settings.autoSyncIntervalSec || 300}
+        hasUpdate={updateInfo.hasUpdate}
+        updateVersion={updateInfo.version}
+        onOpenUpdateModal={() => setUpdateInfo((prev) => ({ ...prev, isOpen: true }))}
       />
 
-      {/* 넥슨 Open API (503) & 메이플 게임 서버 (500) 점검 안내 배너 */}
+      {/* 넥슨 Open API & 메이플 게임 서버 점검 안내 배너 (단일 빨간색 통합) */}
       {isMaintenanceBannerVisible && maintenanceInfo.isMaintenance && (
         <div 
-          className={`w-full border-b px-4 py-2 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-1 duration-200 z-30 select-none ${
-            maintenanceInfo.type === 'game_maintenance'
-              ? 'bg-gradient-to-r from-rose-500/15 via-orange-500/10 to-rose-500/15 border-rose-500/30 text-rose-950 dark:text-rose-200'
-              : 'bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-amber-500/30 text-amber-950 dark:text-amber-200'
-          }`}
+          className="w-full border-b px-4 py-2 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-1 duration-200 z-30 select-none bg-gradient-to-r from-red-500/15 via-rose-500/10 to-red-500/15 border-red-500/30 text-red-950 dark:text-red-200"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <span 
-              className={`p-1 rounded-md flex-shrink-0 ${
-                maintenanceInfo.type === 'game_maintenance'
-                  ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
-                  : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
-              }`}
-            >
+            <span className="p-1 rounded-md flex-shrink-0 bg-red-500/20 text-red-600 dark:text-red-400">
               <AlertTriangle className="w-4 h-4 animate-pulse" />
             </span>
             <div className="flex items-center gap-2 flex-wrap">
-              <span 
-                className={`px-2 py-0.5 rounded-full font-bold text-[10px] tracking-wide ${
-                  maintenanceInfo.type === 'game_maintenance'
-                    ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300'
-                    : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
-                }`}
-              >
-                {maintenanceInfo.badge || (maintenanceInfo.type === 'game_maintenance' ? '게임 서버 점검/오류' : 'API 점검 안내')}
+              <span className="px-2 py-0.5 rounded-full font-bold text-[10px] tracking-wide bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/30">
+                점검 중
               </span>
+              {maintenanceInfo.errorCode && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-black/10 dark:bg-white/10 text-slate-700 dark:text-slate-300 border border-black/5 dark:border-white/10">
+                  {maintenanceInfo.errorCode}
+                </span>
+              )}
               <span className="font-semibold text-slate-800 dark:text-slate-200">
-                {maintenanceInfo.message || (maintenanceInfo.type === 'game_maintenance' ? '메이플스토리 게임 서버 점검 또는 넥슨 내부 통신 지연 중입니다.' : '현재 넥슨 Open API 서버가 점검 중입니다.')}
-              </span>
-              <span className="text-slate-600 dark:text-slate-400 text-[11px] hidden sm:inline">
-                점검 중에도 일일/주간 숙제 수동 체크, 캐릭터 관리 및 메모 기능은 안전하게 100% 정상 작동합니다.
+                메이플스토리 or 넥슨 OPEN API 점검 중
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-            {/* 상태 재확인 버튼 */}
-            <button
-              type="button"
-              onClick={() => handleCheckMaintenance(true)}
-              disabled={isCheckingMaintenance}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs disabled:opacity-50 ${
-                maintenanceInfo.type === 'game_maintenance'
-                  ? 'bg-white/80 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 border-rose-500/30 text-rose-800 dark:text-rose-300'
-                  : 'bg-white/80 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 border-amber-500/30 text-amber-800 dark:text-amber-300'
-              }`}
-              title="API 상태 재확인"
-            >
-              <RefreshCw className={`w-3 h-3 ${isCheckingMaintenance ? 'animate-spin' : ''}`} />
-              <span>{isCheckingMaintenance ? '확인 중...' : '상태 재확인'}</span>
-            </button>
-
             {/* 닫기 버튼 */}
             <button
               type="button"
@@ -2118,7 +2226,7 @@ export default function App() {
       )}
 
       {/* 2. 메인 뷰 (데스크톱: 3분할 가로 정렬 / 모바일: 하단 탭에 따른 단일 전체화면 뷰) */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-[#F8F9FB] dark:bg-slate-950 min-h-0 min-w-0 relative">
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-[#FBF3EB] dark:bg-[#0B0E14] min-h-0 min-w-0 relative">
         {/* 좌측 사이드바: 캐릭터 목록 (모바일에서는 '캐릭터' 탭의 '목록' 상태일 때 전체 화면으로 표시되며 위아래 스크롤 지원) */}
         <div className={`
           ${mobileTab === 'character' && (mobileCharacterSubView === 'list' || !activeCharacter) ? 'flex' : 'hidden'} 
@@ -2142,7 +2250,6 @@ export default function App() {
             }}
             onSelectTab={(tab) => {
               setActiveTab(tab);
-              setMainViewMode('schedule');
               setMobileCharacterSubView('detail');
             }}
             onOpenLegalModal={handleOpenLegalModal}
@@ -2155,12 +2262,12 @@ export default function App() {
           id="main-content-section" 
           className={`
             ${mobileTab === 'character' && mobileCharacterSubView === 'detail' && activeCharacter ? 'flex' : 'hidden'}
-            lg:flex flex-1 flex-col bg-[#F8F9FB] dark:bg-slate-950 overflow-hidden min-h-0 min-w-0 h-full pb-0
+            lg:flex flex-1 flex-col bg-[#FBF3EB] dark:bg-[#0B0E14] overflow-hidden min-h-0 min-w-0 h-full pb-0
           `}
         >
           {/* 모바일 전용 상단 캐릭터 전환 미니 바: 캐릭터 목록으로 돌아가기 버튼 + 현재 캐릭터 정보 + 스케줄 설정 버튼 */}
           {activeCharacter && (
-            <div className="lg:hidden px-3.5 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 flex-shrink-0 shadow-2xs">
+            <div className="lg:hidden px-3.5 py-2.5 bg-[#FCF6EF] dark:bg-[#111620] border-b border-[#EEDFD0] dark:border-[#222B3C] flex items-center justify-between gap-2 flex-shrink-0 shadow-2xs">
               <button
                 type="button"
                 id="btn-mobile-back-to-char-list"
@@ -2174,14 +2281,14 @@ export default function App() {
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
                   {activeCharacter.characterName}
                 </span>
-                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-300 bg-[#F8EDE1] dark:bg-[#20293B] px-1.5 py-0.5 rounded">
                   Lv.{activeCharacter.characterLevel}
                 </span>
                 <button
                   type="button"
                   id="btn-mobile-schedule-config"
                   onClick={() => setConfigCharacterId(activeCharacter.id)}
-                  className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-orange-500 active:scale-95 transition-all cursor-pointer"
+                  className="p-1.5 rounded-xl bg-[#F8EDE1] dark:bg-[#20293B] text-slate-600 dark:text-slate-300 hover:text-orange-500 active:scale-95 transition-all cursor-pointer"
                   title="스케줄 설정"
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -2198,12 +2305,12 @@ export default function App() {
               <div 
                 ref={tabScrollRef}
                 onWheel={handleTabWheel}
-                className="hidden lg:flex px-5 sm:px-6 py-3.5 bg-[#F8F9FB] dark:bg-slate-950 items-center justify-between gap-3 flex-shrink-0 overflow-x-auto custom-scrollbar"
+                className="hidden lg:flex px-5 sm:px-6 py-3.5 bg-[#FBF3EB] dark:bg-[#0B0E14] items-center justify-between gap-3 flex-shrink-0 overflow-x-auto custom-scrollbar"
               >
                 <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
                   {/* 한국어 탭 세그먼트 버튼 (부드러운 슬라이딩 모션 전환) */}
                   <LayoutGroup id="mainTabsGroup">
-                    <div className="flex bg-white dark:bg-slate-900 rounded-xl p-1 border border-slate-200 dark:border-slate-800 shadow-xs flex-shrink-0 relative">
+                    <div className="flex bg-[#FFFDFB] dark:bg-[#111620] rounded-xl p-1 border border-[#EEDFD0] dark:border-[#222B3C] shadow-xs flex-shrink-0 relative">
                       {[
                         { id: 'all', label: '전체', icon: LayoutGrid, activeBg: 'bg-orange-500', activeText: 'text-white' },
                         { id: 'daily', label: '일일 컨텐츠', icon: Calendar, activeBg: 'bg-amber-500', activeText: 'text-white' },
@@ -2212,7 +2319,7 @@ export default function App() {
                         { id: 'bosses', label: '주간 보스', icon: Crown, activeBg: 'bg-purple-600', activeText: 'text-white' },
                         { id: 'custom', label: '커스텀', icon: Plus, activeBg: 'bg-black dark:bg-white', activeText: 'text-white dark:text-black' },
                       ].map((tab) => {
-                        const isActive = mainViewMode === 'schedule' && activeTab === tab.id;
+                        const isActive = activeTab === tab.id;
                         const Icon = tab.icon;
                         return (
                           <button
@@ -2220,12 +2327,11 @@ export default function App() {
                             id={`tab-btn-${tab.id}`}
                             onClick={() => {
                               setActiveTab(tab.id as any);
-                              setMainViewMode('schedule');
                             }}
                             className={`relative px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer z-10 select-none ${
                               isActive
                                 ? tab.activeText
-                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-[#F8EDE1]/80 dark:hover:bg-[#20293B]/80'
                             }`}
                           >
                             {isActive && (
@@ -2245,28 +2351,9 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {/* 환산 버튼 (데스크톱 전용: 웹 빌드 시 트리쉐이킹으로 코드 자체 100% 제거) */}
-                  {__DESKTOP_SCOUTER_ENABLED__ && (
-                    <button
-                      type="button"
-                      id="btn-scouter-conversion"
-                      onClick={() => {
-                        setMainViewMode((prev) => (prev === 'conversion' ? 'schedule' : 'conversion'));
-                      }}
-                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer active:scale-95 ${
-                        mainViewMode === 'conversion'
-                          ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-500 shadow-sm'
-                          : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800'
-                      }`}
-                    >
-                      <Calculator className={`w-3.5 h-3.5 ${mainViewMode === 'conversion' ? 'text-white' : 'text-orange-500'}`} />
-                      <span>환산</span>
-                    </button>
-                  )}
-
                   <button
                     onClick={() => setConfigCharacterId(activeCharacter.id)}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#FFFDFB] dark:bg-[#171E2C] hover:bg-[#FDF8F2] dark:hover:bg-[#20293B] text-slate-700 dark:text-slate-200 border border-[#EEDFD0] dark:border-[#283347] transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
                     title="캐릭터별 컨텐츠 및 보스 표시 설정"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5 text-orange-500" />
@@ -2275,23 +2362,12 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 환산 페이지 뷰 or 스케줄 목록 뷰 조건부 렌더링 (웹 빌드 시 완전 증발) */}
-              {__DESKTOP_SCOUTER_ENABLED__ && mainViewMode === 'conversion' ? (
-                <ConversionPageView 
-                  character={activeCharacter} 
-                  onUpdateCharacter={(updatedChar) => {
-                    const nextChars = characters.map((c) => (c.id === updatedChar.id ? updatedChar : c));
-                    setCharacters(nextChars);
-                    charactersRef.current = nextChars;
-                    persistData(nextChars, recordsRef.current, settingsRef.current, activeCharacterId);
-                  }}
-                />
-              ) : (
-                /* 스크롤 가능한 콘텐츠 뷰 (모바일 브라우저 하단 툴바 및 하단바 가림 방지 여유 공간 확보) */
-                <div className="flex-1 overflow-y-scroll p-4 sm:p-6 space-y-6 custom-scrollbar [scrollbar-gutter:stable] pb-[calc(env(safe-area-inset-bottom,0px)+5rem)] lg:pb-6">
+              {/* 스크롤 가능한 콘텐츠 뷰: 우측 슬라이드 바(스크롤바) 숨김 적용 (마우스 휠 스크롤은 정상 작동) */}
+              {/* 맨 아래줄 보스 카드 호버 시 화면 흔들림 방지를 위한 최적의 하단 여유 패딩(lg:pb-26) */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 no-scrollbar pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] lg:pb-26">
                 {(activeTab === 'all' || activeTab === 'daily') && (
                   <DailyTaskList
-                    key={`${activeCharacter.id}-${collapseTrigger}-daily`}
+                    key={`${activeCharacter.id}-daily`}
                     character={activeCharacter}
                     record={records[activeCharacter.id]}
                     onToggleTask={handleToggleTask}
@@ -2299,13 +2375,15 @@ export default function App() {
                     onOpenContentConfig={() => setConfigCharacterId(activeCharacter.id)}
                     soundEnabled={settings.soundEnabled}
                     collapsible={activeTab === 'all'}
+                    isCollapsed={sectionCollapsedMap.daily}
+                    onToggleCollapse={() => handleToggleSectionCollapse('daily')}
                     isAlertActive={activeCharAlert?.dailyAlert}
                   />
                 )}
 
                 {(activeTab === 'all' || activeTab === 'daily_boss') && (
                   <DailyBossList
-                    key={`${activeCharacter.id}-${collapseTrigger}-daily-boss`}
+                    key={`${activeCharacter.id}-daily-boss`}
                     character={activeCharacter}
                     record={records[activeCharacter.id]}
                     onToggleDailyBoss={handleToggleDailyBoss}
@@ -2314,13 +2392,15 @@ export default function App() {
                     onOpenContentConfig={() => setConfigCharacterId(activeCharacter.id)}
                     soundEnabled={settings.soundEnabled}
                     collapsible={activeTab === 'all'}
+                    isCollapsed={sectionCollapsedMap.daily_boss}
+                    onToggleCollapse={() => handleToggleSectionCollapse('daily_boss')}
                     isAlertActive={activeCharAlert?.dailyBossAlert}
                   />
                 )}
 
                 {(activeTab === 'all' || activeTab === 'weekly') && (
                   <WeeklyTaskList
-                    key={`${activeCharacter.id}-${collapseTrigger}-weekly`}
+                    key={`${activeCharacter.id}-weekly`}
                     character={activeCharacter}
                     record={records[activeCharacter.id]}
                     onToggleTask={handleToggleTask}
@@ -2328,13 +2408,15 @@ export default function App() {
                     onOpenContentConfig={() => setConfigCharacterId(activeCharacter.id)}
                     soundEnabled={settings.soundEnabled}
                     collapsible={activeTab === 'all'}
+                    isCollapsed={sectionCollapsedMap.weekly}
+                    onToggleCollapse={() => handleToggleSectionCollapse('weekly')}
                     isAlertActive={activeCharAlert?.weeklyAlert}
                   />
                 )}
 
                 {(activeTab === 'all' || activeTab === 'bosses') && (
                   <WeeklyBossList
-                    key={`${activeCharacter.id}-${collapseTrigger}-bosses`}
+                    key={`${activeCharacter.id}-bosses`}
                     character={activeCharacter}
                     record={records[activeCharacter.id]}
                     onToggleBoss={handleToggleBoss}
@@ -2342,26 +2424,30 @@ export default function App() {
                     onOpenContentConfig={() => setConfigCharacterId(activeCharacter.id)}
                     soundEnabled={settings.soundEnabled}
                     collapsible={activeTab === 'all'}
+                    isCollapsed={sectionCollapsedMap.bosses}
+                    onToggleCollapse={() => handleToggleSectionCollapse('bosses')}
                     isAlertActive={activeCharAlert?.bossAlert}
                   />
                 )}
 
                 {(activeTab === 'all' || activeTab === 'bosses') && (
                   <BlackMageCard
-                    key={`${activeCharacter.id}-${collapseTrigger}-black-mage`}
+                    key={`${activeCharacter.id}-black-mage`}
                     character={activeCharacter}
                     record={records[activeCharacter.id]}
                     onToggleBlackMage={handleToggleBlackMage}
                     onOpenContentConfig={() => setConfigCharacterId(activeCharacter.id)}
                     soundEnabled={settings.soundEnabled}
                     collapsible={activeTab === 'all'}
+                    isCollapsed={sectionCollapsedMap.black_mage}
+                    onToggleCollapse={() => handleToggleSectionCollapse('black_mage')}
                     isAlertActive={activeCharAlert?.blackMageAlert}
                   />
                 )}
 
                 {(activeTab === 'all' || activeTab === 'custom') && (
                   <CustomTaskList
-                    key={`${activeCharacter.id}-${collapseTrigger}-custom`}
+                    key={`${activeCharacter.id}-custom`}
                     character={activeCharacter}
                     record={records[activeCharacter.id]}
                     onToggleCustomTask={handleToggleCustomTask}
@@ -2369,11 +2455,12 @@ export default function App() {
                     onOpenContentConfig={() => setConfigCharacterId(activeCharacter.id)}
                     soundEnabled={settings.soundEnabled}
                     collapsible={activeTab === 'all'}
+                    isCollapsed={sectionCollapsedMap.custom}
+                    onToggleCollapse={() => handleToggleSectionCollapse('custom')}
                     isAlertActive={activeCharAlert?.customAlert}
                   />
                 )}
               </div>
-              )}
             </div>
               );
             })()
@@ -2522,6 +2609,18 @@ export default function App() {
         incompleteList={incompleteAlertList}
         incompleteAccountTasks={accountAlertStatus.incompleteTasks}
         onSelectCharacter={handleSelectCharacter}
+      />
+
+      {/* 데스크톱 앱 새로운 버전 업데이트 안내 모달 */}
+      <UpdateModal
+        isOpen={updateInfo.isOpen}
+        version={updateInfo.version}
+        onClose={() => setUpdateInfo((prev) => ({ ...prev, isOpen: false }))}
+        onUpdate={() => {
+          if ((window as any).electronAPI?.quitAndInstall) {
+            (window as any).electronAPI.quitAndInstall();
+          }
+        }}
       />
 
       {/* 웹 환경 전용 인앱 PiP 오버레이 (임시 웹 PiP 숨김 처리: 데스크톱만 지원하도록 보호하며 코드는 100% 보존) */}

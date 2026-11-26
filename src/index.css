@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-[#F8F9FB] text-slate-800 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased overflow-hidden select-none;
+    @apply bg-[#FBF3EB] text-slate-800 dark:bg-[#0B0E14] dark:text-slate-100 font-sans antialiased overflow-hidden select-none;
     -webkit-user-select: none;
     user-select: none;
   }
@@ -113,7 +113,7 @@ a {
   50% {
     border-color: #f87171; /* red-400 */
     box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2), 0 2px 5px rgba(239, 68, 68, 0.1);
-    background-color: #ffffff; /* white (완전 불투명) */
+    background-color: #fffdfb; /* 크림 화이트 (완전 불투명) */
   }
 }
 
@@ -126,7 +126,7 @@ a {
   50% {
     border-color: #f87171;
     box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2), 0 2px 5px rgba(239, 68, 68, 0.1);
-    background-color: #0f172a; /* slate-900 (완전 불투명) */
+    background-color: #171E2C; /* 다크모드 카드 기본 표면 */
   }
 }
 
