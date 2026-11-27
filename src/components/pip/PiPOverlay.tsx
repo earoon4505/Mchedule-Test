@@ -333,12 +333,12 @@ export const PiPOverlay: React.FC<PiPOverlayProps> = React.memo(({
                     : 'w-[52px] h-[52px] min-w-[52px] min-h-[52px] max-w-[52px] max-h-[52px] p-1'
                 } aspect-square rounded-2xl border flex items-center justify-center transition-all cursor-pointer shadow-sm relative select-none flex-shrink-0 ${
                   isItemAlerting
-                    ? 'border-red-500 shadow-md alert-pulse-red bg-red-50 dark:bg-slate-900'
+                    ? 'border-red-500 shadow-md alert-pulse-red bg-red-50 dark:bg-th-card'
                     : isDone
                     ? item.type === 'daily'
                       ? 'bg-amber-50 dark:bg-amber-950/80 border-amber-400 dark:border-amber-500 shadow-amber-500/20 ring-1 ring-amber-400/40'
                       : 'bg-rose-50 dark:bg-rose-950/80 border-rose-400 dark:border-rose-500 shadow-rose-500/20 ring-1 ring-rose-400/40'
-                    : 'bg-[#FFFDFB] dark:bg-[#171E2C]/90 border-[#EEDFD0] dark:border-[#283347] hover:border-orange-300 dark:hover:border-orange-500/70'
+                    : 'bg-th-card/90 border-th-border-card hover:border-orange-300 dark:hover:border-orange-500/70'
                 }`}
               >
                 <div className="relative flex items-center justify-center">
@@ -387,12 +387,12 @@ export const PiPOverlay: React.FC<PiPOverlayProps> = React.memo(({
           title={`[계정 컨텐츠] ${item.name} (${item.type === 'daily' ? '일일' : '주간'})\n${isDone ? '완료됨 (클리어)' : '미완료'}\n(클릭하여 완료 토글)`}
           className={`w-[54px] h-[54px] min-w-[54px] min-h-[54px] max-w-[54px] max-h-[54px] aspect-square rounded-2xl border flex items-center justify-center p-1 transition-all cursor-pointer shadow-sm relative select-none flex-shrink-0 ${
             isItemAlerting
-              ? 'border-red-500 shadow-md alert-pulse-red bg-red-50 dark:bg-slate-900'
+              ? 'border-red-500 shadow-md alert-pulse-red bg-red-50 dark:bg-th-card'
               : isDone
               ? item.type === 'daily'
                 ? 'bg-amber-50 dark:bg-amber-950/80 border-amber-400 dark:border-amber-500 shadow-amber-500/20 ring-1 ring-amber-400/40'
                 : 'bg-rose-50 dark:bg-rose-950/80 border-rose-400 dark:border-rose-500 shadow-rose-500/20 ring-1 ring-rose-400/40'
-              : 'bg-[#FFFDFB] dark:bg-[#171E2C]/90 border-[#EEDFD0] dark:border-[#283347] hover:border-orange-300 dark:hover:border-orange-500/70'
+              : 'bg-th-card/90 border-th-border-card hover:border-orange-300 dark:hover:border-orange-500/70'
           }`}
         >
           <div className="relative flex items-center justify-center">
@@ -517,7 +517,7 @@ export const PiPOverlay: React.FC<PiPOverlayProps> = React.memo(({
                       ? item.type === 'daily'
                         ? 'bg-amber-100 dark:bg-amber-950 border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/40'
                         : 'bg-rose-100 dark:bg-rose-950 border-rose-400 dark:border-rose-500 ring-2 ring-rose-400/40'
-                      : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-orange-300 dark:hover:border-orange-500/70'
+                      : 'bg-th-card border-th-border-card hover:border-orange-300 dark:hover:border-orange-500/70'
                   }`}
                 >
                   <div className={`relative w-11 h-11 rounded-xl flex items-center justify-center p-1 transition-all ${
@@ -525,7 +525,7 @@ export const PiPOverlay: React.FC<PiPOverlayProps> = React.memo(({
                       ? item.type === 'daily'
                         ? 'bg-amber-200/60 dark:bg-amber-900/60'
                         : 'bg-rose-200/60 dark:bg-rose-900/60'
-                      : 'bg-[#F8EDE1] dark:bg-[#20293B]'
+                      : 'bg-th-pill-soft'
                   }`}>
                     <MapleIcon
                       taskId={item.id}
@@ -591,14 +591,14 @@ export const PiPOverlay: React.FC<PiPOverlayProps> = React.memo(({
                     title={`${char.characterName} (Lv.${char.characterLevel})\n일일 ${dailyDone}/${dailyTotal} · 일보 ${dailyBossDone}/${dailyBossTotal} · 주간 ${weeklyDone}/${weeklyTotal} · 주보 ${clearedBossCount}/${bossThreshold}`}
                     className={`group relative p-1 rounded-2xl border transition-colors cursor-pointer select-none w-[56px] min-w-[56px] max-w-[56px] h-[56px] min-h-[56px] max-h-[56px] flex-shrink-0 shadow-none flex items-center justify-center box-border ${
                       isAlerting
-                        ? 'border-red-500 alert-pulse-red bg-red-50 dark:bg-slate-900'
+                        ? 'border-red-500 alert-pulse-red bg-red-50 dark:bg-th-card'
                         : isAllCompleted
                         ? isActive
                           ? 'bg-emerald-100 dark:bg-emerald-950 border-emerald-500 ring-2 ring-emerald-400'
                           : 'bg-emerald-50 dark:bg-emerald-950 border-emerald-400 hover:border-emerald-500'
                         : isActive
-                        ? 'bg-orange-50 dark:bg-[#171E2C] border-orange-400 ring-2 ring-orange-400/60'
-                        : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-orange-300 dark:hover:border-orange-500/70'
+                        ? 'bg-orange-50 dark:bg-th-card border-orange-400 ring-2 ring-orange-400/60'
+                        : 'bg-th-card border-th-border-card hover:border-orange-300 dark:hover:border-orange-500/70'
                     }`}
                   >
                     <CharacterAvatar
@@ -631,14 +631,14 @@ export const PiPOverlay: React.FC<PiPOverlayProps> = React.memo(({
                   }}
                   className={`group relative p-3 rounded-2xl border transition-colors cursor-pointer select-none w-[280px] min-w-[280px] max-w-[280px] h-[142px] min-h-[142px] max-h-[142px] flex-shrink-0 shadow-none box-border flex flex-col justify-between overflow-hidden ${
                     isAlerting
-                      ? 'border-red-500 alert-pulse-red bg-red-50 dark:bg-slate-900'
+                      ? 'border-red-500 alert-pulse-red bg-red-50 dark:bg-th-card'
                       : isAllCompleted
                       ? isActive
                         ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 dark:border-emerald-500 shadow-sm ring-1 ring-emerald-500/40'
                         : 'bg-emerald-50 dark:bg-emerald-950 border-emerald-300 dark:border-emerald-800 hover:border-emerald-400 dark:hover:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900 shadow-xs'
                       : isActive
-                      ? 'bg-[#FFFDFB] dark:bg-[#171E2C] border-orange-400 dark:border-orange-500 shadow-sm ring-2 ring-orange-500/20 dark:ring-orange-500/30'
-                      : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-[#DEC8B3] dark:hover:border-[#3A4966] hover:bg-[#FDF8F2] dark:hover:bg-[#1D2536] shadow-xs hover:shadow-sm'
+                      ? 'bg-th-card border-orange-400 dark:border-orange-500 shadow-sm ring-2 ring-orange-500/20 dark:ring-orange-500/30'
+                      : 'bg-th-card border-th-border-card hover:border-th-border-strong hover:bg-th-card-hover shadow-xs hover:shadow-sm'
                   }`}
                 >
                   {/* 1. 상단 캐릭터 기본 헤더 (프로필 사진과 닉네임/정보를 세로 중앙 정렬) */}
@@ -668,7 +668,7 @@ export const PiPOverlay: React.FC<PiPOverlayProps> = React.memo(({
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                           isAllCompleted
                             ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300'
-                            : 'bg-[#F8EDE1] dark:bg-[#20293B] text-slate-600 dark:text-slate-300'
+                            : 'bg-th-pill-soft text-slate-600 dark:text-slate-300'
                         }`}>
                           Lv.{char.characterLevel}
                         </span>
@@ -756,7 +756,7 @@ export const PiPOverlay: React.FC<PiPOverlayProps> = React.memo(({
                     ) : (
                       <div
                         title="검은 마법사 미등록"
-                        className="flex items-center justify-center gap-1 font-medium py-1 px-1 rounded border border-transparent text-slate-400 dark:text-slate-400/80 bg-[#F8EDE1]/50 dark:bg-[#20293B]/65 select-none min-w-0 leading-tight whitespace-nowrap overflow-hidden"
+                        className="flex items-center justify-center gap-1 font-medium py-1 px-1 rounded border border-transparent text-slate-400 dark:text-slate-400/80 bg-th-pill-soft/50 dark:bg-th-pill-soft/65 select-none min-w-0 leading-tight whitespace-nowrap overflow-hidden"
                       >
                         <span className="truncate">검마 -</span>
                       </div>
@@ -828,7 +828,7 @@ export const PiPOverlay: React.FC<PiPOverlayProps> = React.memo(({
                     ) : (
                       <div
                         title="커스텀 컨텐츠 미등록"
-                        className="flex items-center justify-center gap-1 font-medium py-1 px-1 rounded border border-transparent text-slate-400 dark:text-slate-400/80 bg-[#F8EDE1]/50 dark:bg-[#20293B]/65 select-none min-w-0 leading-tight whitespace-nowrap overflow-hidden"
+                        className="flex items-center justify-center gap-1 font-medium py-1 px-1 rounded border border-transparent text-slate-400 dark:text-slate-400/80 bg-th-pill-soft/50 dark:bg-th-pill-soft/65 select-none min-w-0 leading-tight whitespace-nowrap overflow-hidden"
                       >
                         <span className="truncate">커스텀 -</span>
                       </div>

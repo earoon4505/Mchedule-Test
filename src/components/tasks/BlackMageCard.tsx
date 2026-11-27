@@ -136,7 +136,7 @@ export const BlackMageCard: React.FC<BlackMageCardProps> = React.memo(({
             ? 'border-2 border-red-500 ring-2 ring-red-500/50 animate-pulse bg-red-50/40 dark:bg-red-950/20 shadow-md shadow-red-500/20'
             : isAllCompleted
             ? 'bg-black dark:bg-black border-red-600 dark:border-red-600 ring-1 ring-red-600/50 text-white shadow-xs'
-            : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] text-slate-900 dark:text-white'
+            : 'bg-th-card border-th-border-card text-slate-900 dark:text-white'
         }`}
       >
         <div className="flex items-center gap-3 relative z-10">
@@ -192,7 +192,7 @@ export const BlackMageCard: React.FC<BlackMageCardProps> = React.memo(({
               className={`p-1.5 rounded-xl border transition-colors shadow-xs ml-0.5 cursor-pointer ${
                 isAllCompleted
                   ? 'border-red-600 bg-black text-red-400 hover:bg-zinc-900'
-                  : 'border-[#EEDFD0] dark:border-[#303D56] bg-[#FFFDFB] dark:bg-[#20293B] hover:bg-[#FCF6EF] dark:hover:bg-[#2A354C] text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  : 'border-th-border-card dark:border-th-border-pill bg-th-card dark:bg-th-pill-soft hover:bg-th-panel dark:hover:bg-th-pill-hover text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
               title={isCollapsed ? '목록 펼치기' : '목록 접기'}
             >

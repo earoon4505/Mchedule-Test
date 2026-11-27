@@ -94,7 +94,7 @@ export const CustomTaskList: React.FC<CustomTaskListProps> = React.memo(({
             ? 'border-2 border-red-500 ring-2 ring-red-500/50 animate-pulse bg-red-50/40 dark:bg-red-950/20 shadow-md shadow-red-500/20'
             : isAllCompleted
             ? 'bg-zinc-200 border-black ring-1 ring-black/20 text-zinc-950 dark:bg-zinc-700 dark:border-white dark:ring-1 dark:ring-white/20 dark:text-white'
-            : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347]'
+            : 'bg-th-card border-th-border-card'
         }`}
       >
         {/* 숙제 완료 비율에 따른 왼쪽 게이지 채움 */}
@@ -148,7 +148,7 @@ export const CustomTaskList: React.FC<CustomTaskListProps> = React.memo(({
               className={`p-1.5 rounded-xl border transition-colors shadow-xs ml-0.5 cursor-pointer ${
                 isAllCompleted
                   ? 'border-black bg-zinc-300 text-zinc-950 hover:bg-zinc-400 dark:border-white dark:bg-zinc-600 dark:text-white dark:hover:bg-zinc-500'
-                  : 'border-[#EEDFD0] dark:border-[#303D56] bg-[#FFFDFB] dark:bg-[#20293B] hover:bg-[#FCF6EF] dark:hover:bg-[#2A354C] text-slate-500 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white'
+                  : 'border-th-border-card dark:border-th-border-pill bg-th-card dark:bg-th-pill-soft hover:bg-th-panel dark:hover:bg-th-pill-hover text-slate-500 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white'
               }`}
               title={isCollapsed ? '목록 펼치기' : '목록 접기'}
             >
@@ -207,7 +207,7 @@ export const CustomTaskList: React.FC<CustomTaskListProps> = React.memo(({
                 className={`relative h-[86px] p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between select-none shadow-2xs ${
                   isDone
                     ? 'bg-zinc-200 border-black ring-1 ring-black/20 text-zinc-950 dark:bg-zinc-700 dark:border-white dark:ring-1 dark:ring-white/20 dark:text-white'
-                    : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-zinc-400 dark:hover:border-zinc-500'
+                    : 'bg-th-card border-th-border-card hover:border-zinc-400 dark:hover:border-zinc-500'
                 }`}
               >
                 <div className="flex flex-col justify-center min-w-0 flex-1 mr-2">
@@ -225,7 +225,7 @@ export const CustomTaskList: React.FC<CustomTaskListProps> = React.memo(({
                       className={`text-[10px] font-semibold px-1.5 py-0.2 rounded border ${
                         isDone
                           ? 'bg-zinc-300/90 text-zinc-900 border-zinc-400 dark:bg-zinc-600 dark:text-zinc-100 dark:border-zinc-500'
-                          : 'bg-[#F8EDE1] dark:bg-[#20293B] text-slate-600 dark:text-slate-300 border-[#EBDACA] dark:border-[#303D56]'
+                          : 'bg-th-pill-soft text-slate-600 dark:text-slate-300 border-th-border-pill'
                       }`}
                     >
                       {resetLabel}
@@ -241,7 +241,7 @@ export const CustomTaskList: React.FC<CustomTaskListProps> = React.memo(({
                         e.stopPropagation();
                         setEditingTask(task);
                       }}
-                      className="px-2 py-1 rounded-lg border border-[#EBDACA] dark:border-[#303D56] bg-[#F8EDE1] dark:bg-[#20293B] hover:bg-[#F2E2D1] dark:hover:bg-[#2A354C] text-slate-700 dark:text-slate-200 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                      className="px-2 py-1 rounded-lg border border-th-border-pill bg-th-pill-soft hover:bg-th-pill-hover text-slate-700 dark:text-slate-200 text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                       title="커스텀 컨텐츠 수정"
                     >
                       <Edit3 className="w-3 h-3 text-slate-500 dark:text-slate-400" />

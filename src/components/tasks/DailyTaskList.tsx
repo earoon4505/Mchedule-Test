@@ -91,7 +91,7 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
           ? 'border-2 border-red-500 ring-2 ring-red-500/50 animate-pulse bg-red-50/40 dark:bg-red-950/20 shadow-md shadow-red-500/20'
           : isAllCompleted
           ? 'bg-amber-100/90 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700 ring-1 ring-amber-400/30'
-          : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347]'
+          : 'bg-th-card border-th-border-card'
       }`}>
         {/* 숙제 완료 비율에 따른 왼쪽 게이지 채움 (전부 완료 전) */}
         {!isAllCompleted && progressPercent > 0 && (
@@ -138,7 +138,7 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
               className={`p-1.5 rounded-xl border transition-colors shadow-xs ml-0.5 cursor-pointer ${
                 isAllCompleted
                   ? 'border-amber-200 dark:border-amber-800 bg-amber-100/80 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800'
-                  : 'border-[#EEDFD0] dark:border-[#303D56] bg-[#FFFDFB] dark:bg-[#20293B] hover:bg-[#FCF6EF] dark:hover:bg-[#2A354C] text-slate-500 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400'
+                  : 'border-th-border-card dark:border-th-border-pill bg-th-card dark:bg-th-pill-soft hover:bg-th-panel dark:hover:bg-th-pill-hover text-slate-500 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400'
               }`}
               title={isCollapsed ? '목록 펼치기' : '목록 접기'}
             >
@@ -185,7 +185,7 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
               className="pt-3.5 space-y-4"
             >
               {totalCount === 0 ? (
-            <div className="p-8 text-center bg-[#FFFDFB] dark:bg-[#171E2C] border border-[#EEDFD0] dark:border-[#283347] rounded-2xl text-slate-400">
+            <div className="p-8 text-center bg-th-card border border-th-border-card rounded-2xl text-slate-400">
               <p className="text-xs font-semibold">선택된 일일 컨텐츠가 없습니다.</p>
               <button
                 onClick={onOpenContentConfig}
@@ -215,7 +215,7 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
                           className={`relative h-[86px] p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between select-none shadow-2xs ${
                             isDone
                               ? 'bg-amber-100 dark:bg-amber-950 border-amber-300 dark:border-amber-700 ring-1 ring-amber-400/40 shadow-xs'
-                              : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-amber-300 dark:hover:border-amber-700'
+                              : 'bg-th-card border-th-border-card hover:border-amber-300 dark:hover:border-amber-700'
                           }`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
@@ -260,7 +260,7 @@ export const DailyTaskList: React.FC<DailyTaskListProps> = React.memo(({
                           className={`relative h-[86px] p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between select-none shadow-2xs ${
                             isDone
                               ? 'bg-amber-100 dark:bg-amber-950 border-amber-300 dark:border-amber-700 ring-1 ring-amber-400/40 shadow-xs'
-                              : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] hover:border-amber-300 dark:hover:border-amber-700'
+                              : 'bg-th-card border-th-border-card hover:border-amber-300 dark:hover:border-amber-700'
                           }`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">

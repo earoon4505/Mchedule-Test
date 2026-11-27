@@ -55,11 +55,11 @@ export const LegalModal: React.FC<LegalModalProps> = ({
     >
       <div 
         id="legal-modal"
-        className="w-full max-w-2xl bg-[#FBF3EB] dark:bg-[#0B0E14] border border-[#EEDFD0] dark:border-[#222B3C] rounded-2xl shadow-2xl overflow-hidden text-slate-800 dark:text-slate-100 flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl bg-th-canvas border border-th-border-panel rounded-2xl shadow-2xl overflow-hidden text-slate-800 dark:text-slate-100 flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 모달 상단 헤더 */}
-        <div className="px-5 py-4 border-b border-[#EEDFD0] dark:border-[#222B3C] flex items-center justify-between bg-[#FCF6EF] dark:bg-[#111620] flex-shrink-0">
+        <div className="px-5 py-4 border-b border-th-border-panel flex items-center justify-between bg-th-panel flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-orange-100 dark:bg-orange-950/50 flex items-center justify-center text-orange-600 dark:text-orange-400">
               <Scale className="w-4 h-4" />
@@ -76,14 +76,14 @@ export const LegalModal: React.FC<LegalModalProps> = ({
         </div>
 
         {/* 상단 탭 스위처 */}
-        <div className="px-5 pt-3 pb-2 border-b border-[#EEDFD0] dark:border-[#222B3C] bg-[#FCF6EF] dark:bg-[#111620] flex-shrink-0">
-          <div className="flex p-1 rounded-xl bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] gap-1">
+        <div className="px-5 pt-3 pb-2 border-b border-th-border-panel bg-th-panel flex-shrink-0">
+          <div className="flex p-1 rounded-xl bg-th-pill-soft border border-th-border-pill gap-1">
             <button
               type="button"
               onClick={() => handleSwitchTab('terms')}
               className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeTab === 'terms'
-                  ? 'bg-[#FFFDFB] dark:bg-[#171E2C] text-orange-600 dark:text-orange-400 shadow-xs'
+                  ? 'bg-th-card text-orange-600 dark:text-orange-400 shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
@@ -95,7 +95,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               onClick={() => handleSwitchTab('privacy')}
               className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeTab === 'privacy'
-                  ? 'bg-[#FFFDFB] dark:bg-[#171E2C] text-orange-600 dark:text-orange-400 shadow-xs'
+                  ? 'bg-th-card text-orange-600 dark:text-orange-400 shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
@@ -121,9 +121,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제1조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제1조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제1조</span>
                   <span>목적</span>
                 </h4>
                 <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
@@ -132,9 +132,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제2조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제2조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제2조</span>
                   <span>용어의 정의</span>
                 </h4>
                 <ul className="list-disc pl-4 text-slate-600 dark:text-slate-400 text-[11.5px] space-y-1">
@@ -160,9 +160,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제4조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제4조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제4조</span>
                   <span>서비스의 성격 및 무료 제공</span>
                 </h4>
                 <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
@@ -171,9 +171,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제5조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제5조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제5조</span>
                   <span>지식재산권의 귀속 및 비공식 서비스 고지</span>
                 </h4>
                 <div className="text-slate-600 dark:text-slate-400 text-[11.5px] space-y-1">
@@ -185,9 +185,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제6조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제6조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제6조</span>
                   <span>서비스의 내용 및 변경</span>
                 </h4>
                 <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
@@ -196,9 +196,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제7조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제7조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제7조</span>
                   <span>이용자의 의무 및 금지행위</span>
                 </h4>
                 <ul className="list-disc pl-4 text-slate-600 dark:text-slate-400 text-[11.5px] space-y-1">
@@ -209,9 +209,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제8조 - 면책 조항 (개발자 보호) */}
-              <div className="border border-[#EBDACA] dark:border-[#303D56] rounded-xl p-4 bg-[#F8EDE1]/65 dark:bg-[#20293B]/65 space-y-1.5">
+              <div className="border border-th-border-pill rounded-xl p-4 bg-th-pill-soft/65 space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#FFFDFB] dark:bg-[#171E2C] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제8조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-card border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제8조</span>
                   <span>면책 조항 (책임의 한계)</span>
                 </h4>
                 <div className="text-slate-600 dark:text-slate-400 text-[11.5px] space-y-1">
@@ -226,9 +226,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제9조 - 광고 게재 및 서비스 운영 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제9조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제9조</span>
                   <span>광고 게재 및 서비스 운영</span>
                 </h4>
                 <div className="text-slate-600 dark:text-slate-400 text-[11.5px] space-y-1">
@@ -238,15 +238,15 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제10조 및 제11조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제10조 및 제11조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제10조 및 제11조</span>
                   <span>서비스 중단, 준거법 및 공식 문의처</span>
                 </h4>
                 <div className="text-slate-600 dark:text-slate-400 text-[11.5px] space-y-1">
                   <p>• 운영자는 넥슨의 정책 변경, 천재지변, 개인 사정 등 불가피한 경우 서비스의 제공을 중단할 수 있습니다.</p>
                   <p>• 본 약관의 해석 및 서비스 이용과 관련된 분쟁에 대해서는 대한민국 법률을 적용합니다.</p>
-                  <div className="pt-2 mt-2 border-t border-[#EEDFD0] dark:border-[#283347] flex items-center justify-between text-[11px]">
+                  <div className="pt-2 mt-2 border-t border-th-border-card flex items-center justify-between text-[11px]">
                     <span className="font-semibold text-slate-700 dark:text-slate-300">공식 문의: mchedule4505@gmail.com</span>
                     <span className="text-slate-400">시행일자: 2026년 10월 1일</span>
                   </div>
@@ -267,9 +267,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제1조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제1조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제1조</span>
                   <span>개인정보의 처리 목적</span>
                 </h4>
                 <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
@@ -278,9 +278,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제2조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제2조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제2조</span>
                   <span>처리하는 데이터 항목 및 수집 방식</span>
                 </h4>
                 <ul className="list-disc pl-4 text-slate-600 dark:text-slate-400 text-[11.5px] space-y-1">
@@ -290,9 +290,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제3조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제3조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제3조</span>
                   <span>개인정보의 처리 및 보유 기간</span>
                 </h4>
                 <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
@@ -301,9 +301,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제4조 및 제5조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제4조 및 제5조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제4조 및 제5조</span>
                   <span>제3자 제공 및 업무 위탁의 부존재</span>
                 </h4>
                 <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
@@ -312,9 +312,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제6조 및 제7조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제6조 및 제7조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제6조 및 제7조</span>
                   <span>이용자의 권리 행사 및 파기 절차</span>
                 </h4>
                 <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
@@ -323,9 +323,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제8조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제8조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제8조</span>
                   <span>안전성 확보 조치</span>
                 </h4>
                 <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
@@ -334,9 +334,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제9조 - 온라인 맞춤형 광고 및 쿠키(Cookie) 운영 안내 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제9조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제9조</span>
                   <span>온라인 맞춤형 광고 및 쿠키(Cookie) 운영 안내</span>
                 </h4>
                 <div className="text-slate-600 dark:text-slate-400 text-[11.5px] space-y-1.5">
@@ -353,9 +353,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제10조 및 제11조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제10조 및 제11조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제10조 및 제11조</span>
                   <span>개인정보 보호책임자 및 권익침해 구제안내</span>
                 </h4>
                 <div className="text-slate-600 dark:text-slate-400 text-[11.5px] space-y-1">
@@ -368,9 +368,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               </div>
 
               {/* 제12조 */}
-              <div className="border border-[#EEDFD0] dark:border-[#283347] rounded-xl p-4 bg-[#FFFDFB] dark:bg-[#171E2C] space-y-1.5">
+              <div className="border border-th-border-card rounded-xl p-4 bg-th-card space-y-1.5">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded bg-[#F8EDE1] dark:bg-[#20293B] border border-[#EBDACA] dark:border-[#303D56] text-[10px] text-slate-600 dark:text-slate-300 font-bold">제12조</span>
+                  <span className="px-1.5 py-0.5 rounded bg-th-pill-soft border border-th-border-pill text-[10px] text-slate-600 dark:text-slate-300 font-bold">제12조</span>
                   <span>개인정보 처리방침의 변경</span>
                 </h4>
                 <p className="text-slate-600 dark:text-slate-400 text-[11.5px]">
@@ -383,7 +383,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
         </div>
 
         {/* 모달 하단 푸터 */}
-        <div className="px-5 py-3 border-t border-[#EEDFD0] dark:border-[#222B3C] bg-[#FCF6EF] dark:bg-[#111620] flex items-center justify-between flex-shrink-0">
+        <div className="px-5 py-3 border-t border-th-border-panel bg-th-panel flex items-center justify-between flex-shrink-0">
           <div className="text-[10px] text-slate-400 dark:text-slate-500 flex flex-col sm:flex-row sm:items-center sm:gap-2">
             <span>Data based on NEXON Open API</span>
             <span className="hidden sm:inline">|</span>
@@ -393,7 +393,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-slate-900 dark:bg-[#20293B] hover:bg-slate-800 dark:hover:bg-[#2A354C] border border-transparent dark:border-[#303D56] text-white text-xs font-bold rounded-xl transition-colors shadow-xs cursor-pointer"
+            className="px-4 py-1.5 bg-slate-900 dark:bg-th-pill-soft hover:bg-slate-800 dark:hover:bg-th-pill-hover border border-transparent dark:border-th-border-pill text-white text-xs font-bold rounded-xl transition-colors shadow-xs cursor-pointer"
           >
             확인
           </button>

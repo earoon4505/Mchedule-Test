@@ -59,7 +59,7 @@ const BossSpecMiniBar: React.FC<{
         </div>
       </div>
       {/* 게이지 바 */}
-      <div className="w-full h-1.5 bg-[#F8EDE1] dark:bg-[#20293B] rounded-full overflow-hidden">
+      <div className="w-full h-1.5 bg-th-pill-soft rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-300 ${barColor}`}
           style={{ width: `${percent}%` }}
@@ -138,7 +138,7 @@ export const BossScheduleCard: React.FC<BossScheduleCardProps> = ({
         } ${
           isDone
             ? themeDoneBg
-            : `bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347] ${themeBorderActive}`
+            : `bg-th-card border-th-border-card ${themeBorderActive}`
         }`}
       >
         {/* 기본 상단 카드 영역: 이 영역에 마우스가 있을 때만 추가 정보가 표시되며, 벗어나면(추가 정보 영역 포함) 즉시 접힘 */}

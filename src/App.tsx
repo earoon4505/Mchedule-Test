@@ -96,6 +96,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   incompleteCharacterIcon: true,
   showCompletedIcon: true,
   darkMode: false, // 기본 라이트 모드 (토글 버튼으로 원클릭 전환)
+  lightTheme: 'classic', // 라이트 모드 기본 프리셋 (기존 화이트)
+  darkTheme: 'deep', // 다크 모드 기본 프리셋 (4단계 딥 차콜)
   autoSyncIntervalSec: 120, // 2분
   soundEnabled: true,
   includeCustomInCompletion: true,
@@ -397,14 +399,12 @@ export default function App() {
     }
   };
 
-  // 다크모드 HTML 클래스 연동
+  // 다크모드 및 라이트/다크 색상 프리셋 HTML DOM 연동
   useEffect(() => {
-    if (settings.darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [settings.darkMode]);
+    document.documentElement.classList.toggle('dark', !!settings.darkMode);
+    document.documentElement.dataset.lightTheme = settings.lightTheme === 'cream' ? 'cream' : 'classic';
+    document.documentElement.dataset.darkTheme = settings.darkTheme === 'classic' ? 'classic' : 'deep';
+  }, [settings.darkMode, settings.lightTheme, settings.darkTheme]);
 
 
   // 페이지 새로고침(F5) 또는 탭 닫기 시 디바운스 대기 중인 최신 데이터 즉시 서버 동기화 (데스크톱 전용)
@@ -531,7 +531,7 @@ export default function App() {
       if (payload) {
         if (payload.characters) setCharacters(payload.characters);
         if (payload.records) setRecords(payload.records);
-        if (payload.settings) setSettings(payload.settings);
+        if (payload.settings) setSettings({ ...DEFAULT_SETTINGS, ...payload.settings });
         if (payload.activeCharacterId !== undefined) {
           setActiveCharacterId(payload.activeCharacterId);
         }
@@ -736,7 +736,7 @@ export default function App() {
             selectedBossIds: sortBossIdsByStandardOrder(c.selectedBossIds || []),
           }));
           setCharacters(cleanedChars);
-          setSettings(localData.settings || DEFAULT_SETTINGS);
+          setSettings({ ...DEFAULT_SETTINGS, ...(localData.settings || {}) });
           setActiveCharacterId(localData.activeCharacterId || cleanedChars[0]?.id || null);
           setRecords(validatedRecords);
           setIsInitializing(false);
@@ -783,7 +783,7 @@ export default function App() {
                     }
                     return char;
                   });
-                  persistData(updated, validatedRecords, localData?.settings || DEFAULT_SETTINGS, localData?.activeCharacterId || updated[0]?.id || null);
+                  persistData(updated, validatedRecords, { ...DEFAULT_SETTINGS, ...(localData?.settings || {}) }, localData?.activeCharacterId || updated[0]?.id || null);
                   return updated;
                 });
               }
@@ -819,7 +819,7 @@ export default function App() {
           initialData = JSON.parse(localRaw);
           if (initialData && initialData.characters && initialData.characters.length > 0) {
             setCharacters(initialData.characters);
-            setSettings(initialData.settings || DEFAULT_SETTINGS);
+            setSettings({ ...DEFAULT_SETTINGS, ...(initialData.settings || {}) });
             setActiveCharacterId(initialData.activeCharacterId || initialData.characters[0]?.id || null);
             setRecords(checkAndResetRecords(initialData.records || {}, initialData.characters));
           }
@@ -888,7 +888,7 @@ export default function App() {
           loadedData = {
             characters: serverData.characters?.length ? serverData.characters : (initialData.characters || []),
             records: mergedRecords,
-            settings: serverData.settings || initialData.settings || DEFAULT_SETTINGS,
+            settings: { ...DEFAULT_SETTINGS, ...(serverData.settings || initialData.settings || {}) },
             activeCharacterId: serverData.activeCharacterId || initialData.activeCharacterId || null,
             lastServerSync: new Date().toISOString(),
           };
@@ -908,7 +908,7 @@ export default function App() {
             selectedBossIds: sortBossIdsByStandardOrder(c.selectedBossIds || []),
           }));
           setCharacters(cleanedChars);
-          setSettings(loadedData.settings || DEFAULT_SETTINGS);
+          setSettings({ ...DEFAULT_SETTINGS, ...(loadedData.settings || {}) });
           setActiveCharacterId(loadedData.activeCharacterId || cleanedChars[0]?.id || null);
           setRecords(validatedRecords);
 
@@ -953,7 +953,7 @@ export default function App() {
                     }
                     return char;
                   });
-                  persistData(updated, validatedRecords, loadedData.settings || DEFAULT_SETTINGS, loadedData.activeCharacterId || updated[0]?.id || null);
+                  persistData(updated, validatedRecords, { ...DEFAULT_SETTINGS, ...(loadedData.settings || {}) }, loadedData.activeCharacterId || updated[0]?.id || null);
                   return updated;
                 });
               }
@@ -2057,7 +2057,7 @@ export default function App() {
           // 1. 캐릭터, 기록, 설정, 활성 캐릭터 복원
           setCharacters(json.characters);
           setRecords(json.records || {});
-          setSettings(json.settings || DEFAULT_SETTINGS);
+          setSettings({ ...DEFAULT_SETTINGS, ...(json.settings || {}) });
           const nextActiveId = json.activeCharacterId || json.characters[0]?.id || null;
           setActiveCharacterId(nextActiveId);
 
@@ -2080,7 +2080,7 @@ export default function App() {
           }
 
           // 4. 로컬스토리지 및 데스크톱 스토리지 영구 반영
-          await persistData(json.characters, json.records || {}, json.settings || DEFAULT_SETTINGS, nextActiveId);
+          await persistData(json.characters, json.records || {}, { ...DEFAULT_SETTINGS, ...(json.settings || {}) }, nextActiveId);
 
           const keyCountMsg = Array.isArray(json.apiKeys) && json.apiKeys.length > 0 
             ? ` (API 키 ${json.apiKeys.length}개 포함)` 
@@ -2158,14 +2158,14 @@ export default function App() {
 
   if (isInitializing) {
     return (
-      <div className="h-screen w-screen bg-[#FBF3EB] dark:bg-[#0B0E14] flex flex-col items-center justify-center text-slate-800 dark:text-slate-100">
+      <div className="h-screen w-screen bg-th-canvas flex flex-col items-center justify-center text-slate-800 dark:text-slate-100">
         <LoadingSpinner size="xl" text="메이플스토리 스케줄러 시스템을 준비하는 중..." />
       </div>
     );
   }
 
   return (
-    <div className={`h-[100dvh] lg:h-screen w-screen flex flex-col overflow-hidden ${settings.darkMode ? 'dark bg-[#0B0E14] text-slate-100' : 'bg-[#FBF3EB] text-slate-800'}`}>
+    <div className={`h-[100dvh] lg:h-screen w-screen flex flex-col overflow-hidden bg-th-canvas ${settings.darkMode ? 'dark text-slate-100' : 'text-slate-800'}`}>
       {/* 1. 상단 Windows 헤더 */}
       <WindowHeader
         characters={characters}
@@ -2226,7 +2226,7 @@ export default function App() {
       )}
 
       {/* 2. 메인 뷰 (데스크톱: 3분할 가로 정렬 / 모바일: 하단 탭에 따른 단일 전체화면 뷰) */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-[#FBF3EB] dark:bg-[#0B0E14] min-h-0 min-w-0 relative">
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-th-canvas min-h-0 min-w-0 relative">
         {/* 좌측 사이드바: 캐릭터 목록 (모바일에서는 '캐릭터' 탭의 '목록' 상태일 때 전체 화면으로 표시되며 위아래 스크롤 지원) */}
         <div className={`
           ${mobileTab === 'character' && (mobileCharacterSubView === 'list' || !activeCharacter) ? 'flex' : 'hidden'} 
@@ -2262,12 +2262,12 @@ export default function App() {
           id="main-content-section" 
           className={`
             ${mobileTab === 'character' && mobileCharacterSubView === 'detail' && activeCharacter ? 'flex' : 'hidden'}
-            lg:flex flex-1 flex-col bg-[#FBF3EB] dark:bg-[#0B0E14] overflow-hidden min-h-0 min-w-0 h-full pb-0
+            lg:flex flex-1 flex-col bg-th-canvas overflow-hidden min-h-0 min-w-0 h-full pb-0
           `}
         >
           {/* 모바일 전용 상단 캐릭터 전환 미니 바: 캐릭터 목록으로 돌아가기 버튼 + 현재 캐릭터 정보 + 스케줄 설정 버튼 */}
           {activeCharacter && (
-            <div className="lg:hidden px-3.5 py-2.5 bg-[#FCF6EF] dark:bg-[#111620] border-b border-[#EEDFD0] dark:border-[#222B3C] flex items-center justify-between gap-2 flex-shrink-0 shadow-2xs">
+            <div className="lg:hidden px-3.5 py-2.5 bg-th-panel border-b border-th-border-panel flex items-center justify-between gap-2 flex-shrink-0 shadow-2xs">
               <button
                 type="button"
                 id="btn-mobile-back-to-char-list"
@@ -2281,14 +2281,14 @@ export default function App() {
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
                   {activeCharacter.characterName}
                 </span>
-                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-300 bg-[#F8EDE1] dark:bg-[#20293B] px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-300 bg-th-pill-soft px-1.5 py-0.5 rounded">
                   Lv.{activeCharacter.characterLevel}
                 </span>
                 <button
                   type="button"
                   id="btn-mobile-schedule-config"
                   onClick={() => setConfigCharacterId(activeCharacter.id)}
-                  className="p-1.5 rounded-xl bg-[#F8EDE1] dark:bg-[#20293B] text-slate-600 dark:text-slate-300 hover:text-orange-500 active:scale-95 transition-all cursor-pointer"
+                  className="p-1.5 rounded-xl bg-th-pill-soft text-slate-600 dark:text-slate-300 hover:text-orange-500 active:scale-95 transition-all cursor-pointer"
                   title="스케줄 설정"
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -2305,12 +2305,12 @@ export default function App() {
               <div 
                 ref={tabScrollRef}
                 onWheel={handleTabWheel}
-                className="hidden lg:flex px-5 sm:px-6 py-3.5 bg-[#FBF3EB] dark:bg-[#0B0E14] items-center justify-between gap-3 flex-shrink-0 overflow-x-auto custom-scrollbar"
+                className="hidden lg:flex px-5 sm:px-6 py-3.5 bg-th-canvas items-center justify-between gap-3 flex-shrink-0 overflow-x-auto custom-scrollbar"
               >
                 <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
                   {/* 한국어 탭 세그먼트 버튼 (부드러운 슬라이딩 모션 전환) */}
                   <LayoutGroup id="mainTabsGroup">
-                    <div className="flex bg-[#FFFDFB] dark:bg-[#111620] rounded-xl p-1 border border-[#EEDFD0] dark:border-[#222B3C] shadow-xs flex-shrink-0 relative">
+                    <div className="flex bg-th-card dark:bg-th-panel rounded-xl p-1 border border-th-border-panel shadow-xs flex-shrink-0 relative">
                       {[
                         { id: 'all', label: '전체', icon: LayoutGrid, activeBg: 'bg-orange-500', activeText: 'text-white' },
                         { id: 'daily', label: '일일 컨텐츠', icon: Calendar, activeBg: 'bg-amber-500', activeText: 'text-white' },
@@ -2331,7 +2331,7 @@ export default function App() {
                             className={`relative px-3 sm:px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer z-10 select-none ${
                               isActive
                                 ? tab.activeText
-                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-[#F8EDE1]/80 dark:hover:bg-[#20293B]/80'
+                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-th-pill-soft/80'
                             }`}
                           >
                             {isActive && (
@@ -2353,7 +2353,7 @@ export default function App() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
                     onClick={() => setConfigCharacterId(activeCharacter.id)}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#FFFDFB] dark:bg-[#171E2C] hover:bg-[#FDF8F2] dark:hover:bg-[#20293B] text-slate-700 dark:text-slate-200 border border-[#EEDFD0] dark:border-[#283347] transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-th-card hover:bg-th-card-hover dark:hover:bg-th-pill-soft text-slate-700 dark:text-slate-200 border border-th-border-card transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
                     title="캐릭터별 컨텐츠 및 보스 표시 설정"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5 text-orange-500" />

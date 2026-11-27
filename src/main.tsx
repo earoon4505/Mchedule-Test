@@ -9,22 +9,28 @@ import './index.css';
 
 const isPiP = window.location.search.includes('pip=') || window.location.hash.includes('pip');
 
-// 독립 웹페이지(/guide, /terms, /privacy) 진입 시 저장된 다크모드 상태를 즉시 DOM에 동기화하여 라이트/다크 테마 일관성 유지
-function syncDocumentDarkModeFromStorage() {
+// 독립 웹페이지(/guide, /terms, /privacy) 진입 시 저장된 다크모드 및 색상 프리셋 상태를 즉시 DOM에 동기화
+function syncDocumentThemeFromStorage() {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_DATA_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       const isDark = !!parsed?.settings?.darkMode;
+      const lightTheme = parsed?.settings?.lightTheme === 'cream' ? 'cream' : 'classic';
+      const darkTheme = parsed?.settings?.darkTheme === 'classic' ? 'classic' : 'deep';
       document.documentElement.classList.toggle('dark', isDark);
+      document.documentElement.dataset.lightTheme = lightTheme;
+      document.documentElement.dataset.darkTheme = darkTheme;
       return;
     }
   } catch (_) {}
   document.documentElement.classList.remove('dark');
+  document.documentElement.dataset.lightTheme = 'classic';
+  document.documentElement.dataset.darkTheme = 'deep';
 }
 
 if (!isPiP && window.location.pathname !== '/') {
-  syncDocumentDarkModeFromStorage();
+  syncDocumentThemeFromStorage();
 }
 
 if (isPiP) {
@@ -67,10 +73,10 @@ function RootApp() {
 
   useEffect(() => {
     if (!isPiP && currentPath !== '/') {
-      syncDocumentDarkModeFromStorage();
+      syncDocumentThemeFromStorage();
       const handleStorage = (e: StorageEvent) => {
         if (e.key === LOCAL_STORAGE_DATA_KEY) {
-          syncDocumentDarkModeFromStorage();
+          syncDocumentThemeFromStorage();
         }
       };
       window.addEventListener('storage', handleStorage);

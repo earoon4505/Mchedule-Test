@@ -130,7 +130,7 @@ export const WeeklyBossList: React.FC<WeeklyBossListProps> = React.memo(({
           ? 'border-2 border-red-500 ring-2 ring-red-500/50 animate-pulse bg-red-50/40 dark:bg-red-950/20 shadow-md shadow-red-500/20'
           : isAllCompleted
           ? 'bg-purple-100/90 dark:bg-[#23083d] border-purple-300 dark:border-purple-700 ring-1 ring-purple-400/30 dark:ring-purple-600/20'
-          : 'bg-[#FFFDFB] dark:bg-[#171E2C] border-[#EEDFD0] dark:border-[#283347]'
+          : 'bg-th-card border-th-border-card'
       }`}>
         {/* 숙제 완료 비율에 따른 왼쪽 게이지 채움 (전부 완료 전) */}
         {!isAllCompleted && progressPercent > 0 && (
@@ -183,7 +183,7 @@ export const WeeklyBossList: React.FC<WeeklyBossListProps> = React.memo(({
               className={`p-1.5 rounded-xl border transition-colors shadow-xs ml-0.5 cursor-pointer ${
                 isAllCompleted
                   ? 'border-purple-200 dark:border-purple-800 bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800'
-                  : 'border-[#EEDFD0] dark:border-[#303D56] bg-[#FFFDFB] dark:bg-[#20293B] hover:bg-[#FCF6EF] dark:hover:bg-[#2A354C] text-slate-500 dark:text-slate-300 hover:text-purple-700 dark:hover:text-purple-400'
+                  : 'border-th-border-card dark:border-th-border-pill bg-th-card dark:bg-th-pill-soft hover:bg-th-panel dark:hover:bg-th-pill-hover text-slate-500 dark:text-slate-300 hover:text-purple-700 dark:hover:text-purple-400'
               }`}
               title={isCollapsed ? '목록 펼치기' : '목록 접기'}
             >
@@ -230,7 +230,7 @@ export const WeeklyBossList: React.FC<WeeklyBossListProps> = React.memo(({
               className="pt-3.5 space-y-4"
             >
               {selectedBosses.length === 0 && unselectedClearedBosses.length === 0 ? (
-            <div className="p-8 text-center bg-[#FFFDFB] dark:bg-[#171E2C] border border-[#EEDFD0] dark:border-[#283347] rounded-2xl text-slate-400">
+            <div className="p-8 text-center bg-th-card border border-th-border-card rounded-2xl text-slate-400">
               <p className="text-xs font-semibold">선택된 주간 보스가 없습니다.</p>
               <button
                 onClick={onOpenContentConfig}
